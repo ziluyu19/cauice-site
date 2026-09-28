@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // ─── 子导航 ───
 const subNavItems = [
@@ -68,6 +70,7 @@ const annualReports = [
     publishDate: '2026-01-15',
     summary: '全年吸纳骨干高校及校办企业等会员单位32家；组织中欧、中新双向考察交流活动4次；推进并发布团体标准3项；发布《2025中国高校科技成果海外转化白皮书》。',
     plan: '2026年度计划重点推进“一带一路”产教融合实训示范区建设，拓展中亚及东盟技术转移节点。',
+    fullContent: '一、2025年度核心业务执行概况\n1. 会员网络拓展：新增清华大学、浙江大学等骨干会员单位，全国入册会员突破120家。\n2. 国际技术撮合：主导举办中欧、中新专场对接路演，促成跨国技术许可与意向合同逾1.2亿元。\n3. 财务与合规：各项经费收支均严格执行总会规章，年度外部审计意见为无保留标准审计结论。',
   },
   {
     year: '2024年度',
@@ -75,13 +78,15 @@ const annualReports = [
     publishDate: '2025-01-12',
     summary: '设立中新高校联合概念验证走廊；开展技术转移经纪人涉外业务骨干培训班3期，参训人员260余人次；完成全国高校涉外技术转移合规自查摸底工作。',
     plan: '2025年度计划加强团体标准立项体系建设，健全对会员单位常态化涉外法律合规咨询服务机制。',
+    fullContent: '一、2024年度工作回顾\n1. 机制创新：首设“国际概念验证走廊”，打通中新绿色储能技术转移路径。\n2. 队伍建设：联合海外专业机构开展涉外技术转移人才高级研修，累计培育骨干260人次。\n3. 行业规范：启动首批3项产学研协同团体标准编制立项。',
   },
   {
     year: '2023年度',
     title: '第一届理事会筹备与开局年度工作总结报告',
     publishDate: '2024-01-10',
-    summary: '完成民政备案与专委会建章立制；确立首批110家发起会员单位；搭设官方门户平台与国际合作项目初始储备库。',
+    summary: '完成民政备案与国专委建章立制；确立首批110家发起会员单位；搭设官方门户平台与国际合作项目初始储备库。',
     plan: '2024年度计划组织首场跨国高校技术路演峰会，完善专家库首期入库遴选工作。',
+    fullContent: '一、建章立制与机构起步\n1. 完成组织机构搭建与秘书处设立。\n2. 制定并审议通过《国际产学研合作工作委员会工作条例》。\n3. 确立第一届理事会领导班子，明确三年工作发展纲要。',
   },
 ];
 
@@ -148,13 +153,22 @@ const messageInquiries = [
     user: '华东某大学科技园发展有限公司 王先生',
     date: '2026-09-12',
     question: '新发布的团体标准 T/CAUI 016-2025 如何申请纸质正式文本及贯标指导服务？',
-    reply: '您好！团体标准正式文本可通过“成果与智库”对应链接进入全国团体标准信息平台在线查阅。如需贯标辅导，请联系标准化工作部（联系电话：010-6891XXXX），我们将在2个工作日内寄送学习材料。（办理时限：2个工作日内响应）',
+    reply: '您好！该标准文本已在协会官网标准公开频道全面上线。若需申领带防伪标识的正式印刷版及贯标专家辅导，请致电标准化工作组（010-6891XXXX 转 802）。（办理时限：即时办结）',
     replyDate: '2026-09-13',
   },
 ];
 
 export default function DisclosurePage() {
   const [activeAnchor, setActiveAnchor] = useState('basic');
+  const [viewingReport, setViewingReport] = useState<any>(null);
+
+  // 在线互动表单
+  const [formType, setFormType] = useState('咨询留言');
+  const [formName, setFormName] = useState('');
+  const [formContact, setFormContact] = useState('');
+  const [formContent, setFormContent] = useState('');
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
+  const [submitFeedback, setSubmitFeedback] = useState<string | null>(null);
 
   const scrollToAnchor = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
@@ -162,9 +176,39 @@ export default function DisclosurePage() {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || !formContact.trim() || !formContent.trim()) {
+      setSubmitFeedback('请完整填写您的姓名/单位、联系方式及具体留言内容');
+      return;
+    }
+
+    setSubmittingInquiry(true);
+    setSubmitFeedback(null);
+
+    try {
+      await addDoc(collection(db, 'inquiries'), {
+        type: formType,
+        name: formName.trim(),
+        contact: formContact.trim(),
+        content: formContent.trim(),
+        status: '待审核办理',
+        createdAt: serverTimestamp(),
+      });
+      setSubmitFeedback('留言提交成功！秘书处将在承诺时限内（3个工作日内）核实并答复。');
+      setFormName('');
+      setFormContact('');
+      setFormContent('');
+    } catch (err: any) {
+      console.error('Inquiry submission error:', err);
+      setSubmitFeedback('提交失败：' + (err.message || '请稍后重试或通过邮箱直接联系秘书处'));
+    } finally {
+      setSubmittingInquiry(false);
+    }
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen text-slate-800">
-
       {/* ─── Banner ─── */}
       <section className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white py-12 lg:py-16 overflow-hidden border-b border-blue-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 relative z-10">
@@ -175,17 +219,17 @@ export default function DisclosurePage() {
           </nav>
           <div className="max-w-3xl">
             <h1 className="text-2xl sm:text-4xl font-extrabold font-serif tracking-tight leading-tight mb-3">
-              信息公开平台
+              信息公开与行业监督平台
             </h1>
-            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed">
-              严格遵循行业协会信息公开规范，全面公开国专委组织架构、年度工作报告、信用承诺与互动监督渠道，接受社会各界监督。
+            <p className="text-xs sm:text-sm text-blue-100/90 leading-relaxed font-sans">
+              严格执行民政部、教育部及中国高校校办产业协会自律规范，规范办会、阳光运作、全面受社会监督。
             </p>
           </div>
         </div>
       </section>
 
-      {/* ─── 7 锚点吸顶子导航 ─── */}
-      <div className="sticky top-[148px] sm:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      {/* ─── 粘性子导航 ─── */}
+      <div className="sticky top-[108px] lg:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="flex items-center space-x-1 overflow-x-auto py-2.5">
             {subNavItems.map((item) => (
@@ -207,24 +251,33 @@ export default function DisclosurePage() {
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8 space-y-12">
-
         {/* ════════════════════════════════
             1. 基本信息
         ════════════════════════════════ */}
-        <section id="basic" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-5">
+        <section id="basic" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-800 rounded-full" />
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">机构基本信息</h2>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">基本信息</h2>
             </div>
-            <span className="text-xs text-slate-500">法定公示基本事项及登记批准备案凭据</span>
+            <span className="text-xs text-slate-500">法定登记设立依据与核心办会属性信息公示</span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
-            {basicInfo.map((item, idx) => (
-              <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-blue-300 transition-all flex flex-col sm:flex-row sm:items-start gap-2">
-                <span className="text-xs font-bold text-slate-600 sm:w-36 shrink-0 pt-0.5">{item.label}：</span>
-                <span className="text-xs sm:text-sm text-slate-800 leading-relaxed flex-1 font-medium">{item.value}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {basicInfo.map((info, idx) => (
+              <div
+                key={idx}
+                className={`p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5 ${
+                  idx === 2 || idx === 3 ? 'md:col-span-2' : ''
+                }`}
+              >
+                <div className="text-xs font-semibold text-blue-900 flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-700" />
+                  <span>{info.label}</span>
+                </div>
+                <div className="text-xs text-slate-700 leading-relaxed font-sans pl-3 border-l-2 border-slate-200">
+                  {info.value}
+                </div>
               </div>
             ))}
           </div>
@@ -233,30 +286,32 @@ export default function DisclosurePage() {
         {/* ════════════════════════════════
             2. 负责人与机构信息
         ════════════════════════════════ */}
-        <section id="leaders" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-5">
+        <section id="leaders" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-800 rounded-full" />
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">负责人与机构信息</h2>
             </div>
-            <span className="text-xs text-slate-500">第一届理事会主要领导成员及履历任职变动情况</span>
+            <span className="text-xs text-slate-500">国专委主要负责人名单、履职分工及职务变动记录</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {leadersData.map((leader, idx) => (
               <div key={idx} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-md transition-all space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-900 border border-blue-200">
-                      {leader.role}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-2">{leader.name}</h3>
-                    <div className="text-xs text-slate-500">{leader.title} · {leader.org}</div>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-900 border border-blue-200">
+                    {leader.role}
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">在任</span>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">{leader.name}</h3>
+                  <div className="text-xs text-slate-500 mt-0.5">{leader.title} · {leader.org}</div>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">{leader.desc}</p>
-                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-500 leading-relaxed">
-                  <span className="font-semibold text-slate-700">任免与变动记录：</span>{leader.changeRecord}
+                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                  <span className="font-semibold text-slate-700">任免与变动记录：</span>
+                  {leader.changeRecord}
                 </div>
               </div>
             ))}
@@ -270,32 +325,31 @@ export default function DisclosurePage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-800 rounded-full" />
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">组织机构体系</h2>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">组织机构架构</h2>
             </div>
-            <span className="text-xs text-slate-500">会员组成、执行机构与专业职能部门设置说明</span>
+            <span className="text-xs text-slate-500">国专委管理运转体系与内设执行部门一览</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* 会员大会及名录 */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
               <div className="space-y-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-800 text-white flex items-center justify-center font-bold text-xs">
                   01
                 </div>
-                <h3 className="text-base font-bold text-slate-900">会员大会与理事单位</h3>
+                <h3 className="text-base font-bold text-slate-900">全国会员网络</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  专委会由全国百余所高校、校属企业、国家大学科技园及技术转移中心组成。会员单位名录由秘书处实施常态化积分与动态年审管理。
+                  涵盖全国高水平大学、骨干校办企业、国家大学科技园与技术转移中心，构成国专委广泛的协同工作网络与服务对象基石。
                 </p>
               </div>
               <Link
                 href="/members"
-                className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition-colors shadow-xs"
+                className="inline-flex items-center text-xs font-semibold text-blue-800 hover:underline"
               >
-                查看完整会员单位名录 →
+                <span>查阅公开会员名录</span>
+                <span className="ml-1">→</span>
               </Link>
             </div>
 
-            {/* 常设秘书处 */}
             <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
               <div className="space-y-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-800 text-white flex items-center justify-center font-bold text-xs">
@@ -311,7 +365,6 @@ export default function DisclosurePage() {
               </div>
             </div>
 
-            {/* 专业办事机构与专委会 */}
             <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col justify-between space-y-4">
               <div className="space-y-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-800 text-white flex items-center justify-center font-bold text-xs">
@@ -354,15 +407,10 @@ export default function DisclosurePage() {
                   <div className="flex items-center space-x-2">
                     <button
                       type="button"
+                      onClick={() => setViewingReport(r)}
                       className="px-3 py-1 rounded border border-blue-300 text-blue-800 text-xs font-semibold hover:bg-blue-50 transition-colors cursor-pointer"
                     >
-                      查看报告
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1 rounded bg-blue-800 hover:bg-blue-900 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                    >
-                      下载 PDF
+                      查看报告全文 →
                     </button>
                   </div>
                 </div>
@@ -407,37 +455,16 @@ export default function DisclosurePage() {
                   <span>服务内容与服务对象承诺</span>
                 </span>
                 <p>
-                  坚决依照协会章程与批准业务范围开展工作，所有国际技术撮合、培训交流与成果展示均以赋能会员单位和促进高校科技自立自强为核心宗旨；不从事与本专委会宗旨无关的营利性商业行为。
+                  坚决依照协会章程与批准业务范围开展工作，所有国际技术撮合、培训交流与成果展示均以赋能会员单位和促进高校科技自立自强为核心宗旨；不从事与国专委宗旨无关的营利性商业行为。
                 </p>
               </div>
-
               <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-2">
                 <span className="font-bold text-slate-900 flex items-center space-x-1">
                   <span className="text-blue-800">■</span>
-                  <span>服务方式与合规边界承诺</span>
+                  <span>会费及服务性收费严格规范</span>
                 </span>
                 <p>
-                  严格遵守涉外法规与技术出口审查要求。在合作对接撮合过程中，明确本专委会非签约民事主体，涉及实体法律行为的须严格加注“经协会授权后实施”，坚决不违规越权承担民事保证担保责任。
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-2">
-                <span className="font-bold text-slate-900 flex items-center space-x-1">
-                  <span className="text-blue-800">■</span>
-                  <span>收费标准与资金自律承诺</span>
-                </span>
-                <p>
-                  严格执行总会统一批准的会费与服务成本分摊标准，决不擅立名目、违规巧立乱收费；会员基础权益均免费提供，公益类研究报告及团体标准完全公开，自觉接受国家审计与会员民主监督。
-                </p>
-              </div>
-
-              <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-2">
-                <span className="font-bold text-slate-900 flex items-center space-x-1">
-                  <span className="text-blue-800">■</span>
-                  <span>信息透明与接受社会监督承诺</span>
-                </span>
-                <p>
-                  确保公开数据的真实性、准确性与时效性，及时响应行业与社会公众咨询监督，依规公布财务预算决算，虚心听取会员诉求，构建廉洁透明的全国性产学研协同平台。
+                  国专委不自行设立独立的会费收费标准或银行基本账户，所有会费缴纳均严格通过中国高校校办产业协会统一账户收取并开具民政部监制全国社会团体会费统一票据；严禁违规摊派与乱收费。
                 </p>
               </div>
             </div>
@@ -451,64 +478,52 @@ export default function DisclosurePage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-800 rounded-full" />
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">重大活动与重点项目公示</h2>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">重点活动与项目情况公开</h2>
             </div>
-            <span className="text-xs text-slate-500">重要合作项目落地进展与重大涉外经贸活动成效</span>
+            <Link href="/international#projects" className="text-xs font-semibold text-blue-800 hover:underline">
+              查看全部国际合作项目 →
+            </Link>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="bg-blue-900 text-white">
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">项目 / 活动名称</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">类别</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">周期 / 时间</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">实施地点</th>
-                  <th className="px-4 py-3 font-semibold min-w-[260px]">实际开展结果与成效</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activitiesProjects.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    className={`border-t border-slate-200 align-top ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-blue-50/40 transition-colors`}
-                  >
-                    <td className="px-4 py-3 font-bold text-slate-900">{item.title}</td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-900 font-medium whitespace-nowrap">
-                        {item.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap font-mono">{item.time}</td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{item.location}</td>
-                    <td className="px-4 py-3 text-slate-700 leading-relaxed">{item.result}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {activitiesProjects.map((item, idx) => (
+              <div key={idx} className="p-5 rounded-xl border border-slate-200 bg-white hover:border-blue-300 hover:shadow-md transition-all space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs px-2.5 py-0.5 rounded font-semibold bg-blue-100 text-blue-800">
+                    {item.type}
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">{item.time}</span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">{item.title}</h3>
+                <div className="text-xs text-slate-500">📍 实施地点：{item.location}</div>
+                <p className="text-xs text-slate-600 leading-relaxed pt-1 border-t border-slate-100">
+                  <span className="font-semibold text-slate-700">成效：</span>{item.result}
+                </p>
+              </div>
+            ))}
           </div>
         </section>
 
         {/* ════════════════════════════════
-            7. 互动交流（三个子模块，含严格时限要求）
+            7. 互动交流（带实时 Firestore 留言提交）
         ════════════════════════════════ */}
-        <section id="interaction" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-8">
+        <section id="interaction" className="scroll-mt-56 bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-800 rounded-full" />
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">互动交流与监督渠道</h2>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">互动交流与建言监督</h2>
             </div>
             <span className="text-xs text-slate-500">明示具体办理时限，切实保障公众知情权与参与监督权</span>
           </div>
 
           {/* 子模块一：意见征集 */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <span className="w-2 h-2 rounded-full bg-blue-800" />
                 <h3 className="text-sm font-bold text-slate-900">意见征集专栏（公开听取行业建言）</h3>
               </div>
-              <span className="text-[11px] text-amber-800 font-semibold bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+              <span className="text-[11px] text-amber-800 font-semibold bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200 self-start sm:self-auto">
                 规定要求：征集结束后15个工作日内向社会公布采用情况
               </span>
             </div>
@@ -534,14 +549,14 @@ export default function DisclosurePage() {
             </div>
           </div>
 
-          {/* 子模块二：咨询留言 */}
+          {/* 子模块二：咨询留言公开选登 */}
           <div className="space-y-4 pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center space-x-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-700" />
                 <h3 className="text-sm font-bold text-slate-900">咨询留言公开选登（办理时限公开）</h3>
               </div>
-              <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 self-start sm:self-auto">
                 公示办理时限：常见咨询不超过3个工作日答复反馈
               </span>
             </div>
@@ -568,31 +583,133 @@ export default function DisclosurePage() {
             </div>
           </div>
 
-          {/* 子模块三：网站纠错 */}
-          <div className="pt-4 border-t border-slate-100">
-            <div className="p-5 rounded-xl border border-amber-300 bg-amber-50/40 space-y-3">
-              <div className="flex items-center space-x-2 text-amber-900 font-bold text-sm">
-                <span className="text-base">⚠️</span>
-                <span>网站纠错机制说明与时限承诺</span>
+          {/* 子模块三：在线提交留言与纠错通道（实时写入 Firestore） */}
+          <div className="pt-4 border-t border-slate-100 space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="w-2 h-2 rounded-full bg-blue-800" />
+              <h3 className="text-sm font-bold text-slate-900">在线提交咨询留言 / 征集建言 / 网站纠错</h3>
+            </div>
+
+            <form onSubmit={handleInquirySubmit} className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
+              {submitFeedback && (
+                <div className={`p-3 rounded-lg border text-xs font-medium ${
+                  submitFeedback.includes('成功')
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}>
+                  {submitFeedback}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">反馈事项类别 *</label>
+                  <select
+                    value={formType}
+                    onChange={(e) => setFormType(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 bg-white"
+                  >
+                    <option value="咨询留言">咨询留言（承诺3工作日内答复）</option>
+                    <option value="意见建言">行业意见征集建言</option>
+                    <option value="网站纠错">网站内容勘误与纠错（承诺1日核实）</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">姓名 / 单位全称 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
+                    placeholder="如：某高校科技处 张老师"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">联系电话 / 电子邮箱 *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formContact}
+                    onChange={(e) => setFormContact(e.target.value)}
+                    placeholder="如：010-XXXX / user@domain.com"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 bg-white"
+                  />
+                </div>
               </div>
-              <p className="text-xs text-amber-900 leading-relaxed">
-                为确保本官方平台发布政策、通知、标准及各项数据的绝对准确，本站特建立常态化纠错保障机制：
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-amber-950 font-medium">
-                <div className="p-3 bg-white/80 rounded-lg border border-amber-200">
-                  <span className="font-bold block text-slate-900 mb-1">功能入口说明：</span>
-                  全站各页面均在底部页脚（Footer）统一常设【网站纠错】与【不良信息举报】专门入口与直通邮箱。
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">具体事项说明 *</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={formContent}
+                  onChange={(e) => setFormContent(e.target.value)}
+                  placeholder="请详细描述您的咨询事项、征集意见或纠错问题线索（附页面链接及具体出处）..."
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-800 bg-white"
+                />
+              </div>
+
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-[11px] text-slate-400">
+                  提交的信息将同步存入国专委秘书处诉求池，全程受协会监督委员会督办。
+                </span>
+                <button
+                  type="submit"
+                  disabled={submittingInquiry}
+                  className="px-5 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {submittingInquiry ? '正在提交...' : '确认在线提交'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      {/* ─── 年度报告全文模态框 ─── */}
+      {viewingReport && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-900">
+                    {viewingReport.year}
+                  </span>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 mt-1">
+                    {viewingReport.title}
+                  </h3>
+                  <div className="text-xs text-slate-400 mt-0.5">公示日期：{viewingReport.publishDate}</div>
                 </div>
-                <div className="p-3 bg-white/80 rounded-lg border border-amber-200">
-                  <span className="font-bold block text-slate-900 mb-1">严格办理时限承诺：</span>
-                  秘书处承诺：所收到错漏信息问题线索于 <span className="font-bold text-red-700 underline">1个工作日内完成核实转办</span>，于 <span className="font-bold text-red-700 underline">3个工作日内办结答复并更正</span>。
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingReport(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 whitespace-pre-wrap font-sans">
+                {viewingReport.fullContent || viewingReport.summary}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setViewingReport(null)}
+                  className="px-5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors"
+                >
+                  关闭
+                </button>
               </div>
             </div>
           </div>
-        </section>
-
-      </main>
+        </div>
+      )}
     </div>
   );
 }

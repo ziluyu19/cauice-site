@@ -11,6 +11,11 @@ export default function Navbar() {
   const [loginTab, setLoginTab] = useState<"account" | "sms">("account");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // 后台管理页面无需渲染前台主导航
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   // Navigation Links (根据要求，“国专委概况”指向独立页面 /guozhuanwei-gaikuang)
   const navItems = [
     { name: "首页", href: "/" },
@@ -82,10 +87,10 @@ export default function Navbar() {
                 服务时间：工作日09:00-12:00,13:30-18:00
               </span>
             </div>
-            <div className="flex items-center space-x-4 select-none">
+            <div className="hidden sm:flex items-center space-x-4 select-none">
               <Link
-                href="/#disclosure"
-                onClick={(e) => handleNavClick(e, "/#disclosure")}
+                href="/disclosure"
+                onClick={(e) => handleNavClick(e, "/disclosure")}
                 className="hover:text-white transition-colors cursor-pointer select-none"
               >
                 信息公开
@@ -121,16 +126,16 @@ export default function Navbar() {
               alt="中国高校校办产业协会 Logo"
               className="w-12 h-12 rounded-full object-contain shrink-0 shadow-xs ring-1 ring-slate-200 group-hover:scale-105 transition-transform"
             />
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <span className="text-base sm:text-xl lg:text-2xl font-bold tracking-tight text-blue-950 font-serif">
+                <span className="text-base sm:text-xl lg:text-2xl font-bold tracking-tight text-blue-950 font-serif truncate">
                   中国高校校办产业协会国际合作与交流专业委员会
                 </span>
                 <span className="hidden lg:inline-block px-2 py-0.5 text-xs font-semibold rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
                   官方门户
                 </span>
               </div>
-              <p className="text-xs text-slate-500 tracking-wider font-medium line-clamp-1">
+              <p className="text-xs text-slate-500 tracking-wider font-medium truncate">
                 International Cooperation and Exchange Committee of the Chinese Association of University-run Industries
               </p>
             </div>
@@ -294,7 +299,7 @@ export default function Navbar() {
       </header>
 
       {/* 吸顶导航占位高度，防止正文被吸顶导航遮挡 */}
-      <div className="h-[148px] sm:h-[156px] w-full shrink-0" aria-hidden="true" />
+      <div className="h-[108px] lg:h-[156px] w-full shrink-0" aria-hidden="true" />
 
       {/* 用户登录/咨询弹窗 (Login & Consultation Modal) */}
       {isLoginOpen && (

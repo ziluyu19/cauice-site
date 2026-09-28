@@ -1,7 +1,17 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+  const pathname = usePathname();
+
+  // 后台管理页面无需渲染前台页脚
+  if (pathname?.startsWith("/admin")) {
+    return null;
+  }
+
   return (
     <footer id="contact" className="bg-slate-950 text-slate-400 text-xs border-t border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-14 lg:py-16">
@@ -96,9 +106,9 @@ export default function Footer() {
                     </Link>
                   </li>
                   <li>
-                    <a href="/#news" className="hover:text-white transition-colors">
+                    <Link href="/news" className="hover:text-white transition-colors">
                       新闻中心
-                    </a>
+                    </Link>
                   </li>
                   <li>
                     <Link href="/notice" className="hover:text-white transition-colors">
@@ -120,29 +130,29 @@ export default function Footer() {
                     </Link>
                   </li>
                   <li>
-                    <a href="/#services" className="hover:text-white transition-colors">
+                    <Link href="/members" className="hover:text-white transition-colors">
                       会员单位与服务
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="/#thinktank" className="hover:text-white transition-colors">
+                    <Link href="/achievements" className="hover:text-white transition-colors">
                       成果与智库
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="/#disclosure" className="hover:text-white transition-colors">
+                    <Link href="/disclosure" className="hover:text-white transition-colors">
                       信息公开
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </div>
             </div>
 
-            <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+            <div className="p-3 bg-slate-900/90 rounded-lg border border-slate-800/80 text-[11px] text-slate-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span>需要协助？拨打全国热线或在线提交诉求</span>
-              <a href="/#services" className="text-blue-400 hover:text-blue-300 font-medium shrink-0">
+              <Link href="/members" className="text-blue-400 hover:text-blue-300 font-medium shrink-0">
                 进入服务矩阵 &rarr;
-              </a>
+              </Link>
             </div>
           </div>
 

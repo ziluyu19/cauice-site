@@ -5,6 +5,8 @@ import Link from "next/link";
 
 export default function GuozhuanweiGaikuangPage() {
   const [activeTab, setActiveTab] = useState<string>("intro");
+  const [downloadToast, setDownloadToast] = useState(false);
+  const [inquirySent, setInquirySent] = useState(false);
 
   // 页内6大子栏目（与规范要求完全一致）
   const subNavItems = [
@@ -81,7 +83,7 @@ export default function GuozhuanweiGaikuangPage() {
       {/* ============================================================ */}
       {/* 页内子导航栏 (Sub-Navigation Sticky Bar) */}
       {/* ============================================================ */}
-      <div className="sticky top-[148px] sm:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <div className="sticky top-[108px] lg:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="flex items-center space-x-1 sm:space-x-3 overflow-x-auto no-scrollbar py-2.5">
             {subNavItems.map((item) => {
@@ -132,7 +134,7 @@ export default function GuozhuanweiGaikuangPage() {
               <span className="font-bold text-blue-950">重要声明：</span>
               中国高校校办产业协会国际合作与交流专业委员会（简称“国专委”）是经国家民政部门登记社会团体——
               <strong className="text-blue-900">中国高校校办产业协会</strong>批准设立的专业分支机构，
-              <strong className="text-blue-900 font-bold">本专委会为中国高校校办产业协会分支机构</strong>。专委会严格在上级协会章程和业务统筹框架下规范运转。
+              <strong className="text-blue-900 font-bold">国专委为中国高校校办产业协会分支机构</strong>。国专委严格在上级协会章程和业务统筹框架下规范运转。
             </div>
 
             {/* 核心法定概况信息表卡片 */}
@@ -159,7 +161,7 @@ export default function GuozhuanweiGaikuangPage() {
                   <span className="text-slate-800">2024年12月批复设立 / 2025年11月正式召开成立大会</span>
                 </div>
                 <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/70 flex items-start space-x-3 md:col-span-2">
-                  <span className="text-slate-400 shrink-0 font-medium w-24">专委会宗旨：</span>
+                  <span className="text-slate-400 shrink-0 font-medium w-24">国专委宗旨：</span>
                   <span className="text-slate-800 font-medium">
                     开放协同、汇聚智慧、产教融合、共赢发展。立足国家高水平对外开放战略，打造融通全球的高校科技成果转化、国际联合技术攻关与高层次产教智库协同公共服务平台。
                   </span>
@@ -182,10 +184,10 @@ export default function GuozhuanweiGaikuangPage() {
             {/* 详细两段论述文字 */}
             <div className="space-y-4 text-xs sm:text-sm text-slate-700 leading-relaxed pt-2 border-t border-slate-100">
               <p className="text-justify indent-8">
-                专委会是在全面深化新时代高等教育综合改革、推进高水平科技自立自强和教育强国建设的大背景下，由全国三十余所重点高校科技开发部、国家大学科技园产业集团及国际科技合作代表机构联合发起设立。依托中国高校校办产业协会的组织优势与全国高校优质科研产业集群，专委会积极担当国家高校产业出海“桥头堡”，搭建起畅通高校实验室与全球经贸产业链对接的权威纽带。
+                国专委是在全面深化新时代高等教育综合改革、推进高水平科技自立自强和教育强国建设的大背景下，由全国三十余所重点高校科技开发部、国家大学科技园产业集团及国际科技合作代表机构联合发起设立。依托中国高校校办产业协会的组织优势与全国高校优质科研产业集群，国专委积极担当国家高校产业出海“桥头堡”，搭建起畅通高校实验室与全球经贸产业链对接的权威纽带。
               </p>
               <p className="text-justify indent-8">
-                聚焦国家战略需求与高校产学研用跨国协同痛点，专委会重点实施“高校校办产业卓越出海赋能行动”、“跨境产学研联合技术攻关计划”与“高校产业智库研究工程”，持续促进高校科技成果跨境合法合规流动与高水平转化，提升中国高等教育与校办科技产业的全球影响力。
+                聚焦国家战略需求与高校产学研用跨国协同痛点，国专委重点实施“高校校办产业卓越出海赋能行动”、“跨境产学研联合技术攻关计划”与“高校产业智库研究工程”，持续促进高校科技成果跨境合法合规流动与高水平转化，提升中国高等教育与校办科技产业的全球影响力。
               </p>
             </div>
           </div>
@@ -271,28 +273,29 @@ export default function GuozhuanweiGaikuangPage() {
                 <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/60">
                   <div className="font-bold text-slate-900 mb-1">第一章 总则与分支机构规约</div>
                   <p className="text-slate-600 leading-relaxed">
-                    专委会全称为“中国高校校办产业协会国际合作与交流专业委员会”，是中国高校校办产业协会下设专业分支机构，在协会章程统筹下开展涉外产教研合作与技术转移活动。
+                    国专委全称为“中国高校校办产业协会国际合作与交流专业委员会”，是中国高校校办产业协会下设专业分支机构，在协会章程统筹下开展涉外产教研合作与技术转移活动。
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/60">
                   <div className="font-bold text-slate-900 mb-1">第二章 领导体制与代表大会职权</div>
                   <p className="text-slate-600 leading-relaxed">
-                    专委会设主任委员1名、副主任委员若干名、秘书长1名。首届理事会经会员代表大会民主选举产生，每届任期五年，届满按章程规范组织换届选举。
+                    国专委设主任委员1名、副主任委员若干名、秘书长1名。首届理事会经会员代表大会民主选举产生，每届任期五年，届满按章程规范组织换届选举。
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/60">
                   <div className="font-bold text-slate-900 mb-1">第三章 国际交流合规与资产审计监督</div>
                   <p className="text-slate-600 leading-relaxed">
-                    专委会严格遵守国家外事纪律与科研出海知识产权法律法规。经费收支全部纳入中国高校校办产业协会法定账户统一管理，接受年度专门审计监督并执行信息公开。
+                    国专委严格遵守国家外事纪律与科研出海知识产权法律法规。经费收支全部纳入中国高校校办产业协会法定账户统一管理，接受年度专门审计监督并执行信息公开。
                   </p>
                 </div>
               </div>
 
               <div className="pt-2">
                 <button
-                  onClick={() => alert("批复文件扫描件及《工作规则》全文规范下载已就绪。")}
+                  type="button"
+                  onClick={() => setDownloadToast(true)}
                   className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-blue-900 hover:bg-blue-800 text-white text-xs font-medium transition-colors cursor-pointer"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -300,6 +303,19 @@ export default function GuozhuanweiGaikuangPage() {
                   </svg>
                   <span>下载《成立批复及工作规则汇编》PDF</span>
                 </button>
+
+                {downloadToast && (
+                  <div className="mt-3 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-lg flex items-center justify-between">
+                    <span>已准备批复公文扫描件及《工作规则》全文汇编，请联络秘书处获取离线文档。</span>
+                    <button
+                      type="button"
+                      onClick={() => setDownloadToast(false)}
+                      className="text-slate-400 hover:text-slate-600 ml-2 font-bold cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -352,7 +368,7 @@ export default function GuozhuanweiGaikuangPage() {
                   <div className="font-bold text-slate-900 text-base mb-1">张敬文 教授</div>
                   <div className="text-xs text-blue-900 font-medium mb-1">北京大学科技开发部 / 中国高校校办产业协会</div>
                   <p className="text-[11px] text-slate-500 leading-normal border-t border-blue-100 pt-2">
-                    两院院士，资深高校科技成果转化与产教协同专家，主持专委会全盘发展与学术战略决策。
+                    两院院士，资深高校科技成果转化与产教协同专家，主持国专委全盘发展与学术战略决策。
                   </p>
                 </div>
 
@@ -462,7 +478,7 @@ export default function GuozhuanweiGaikuangPage() {
                 <div className="font-bold text-blue-950 text-sm mb-1">秘书处设置单位</div>
                 <div className="text-slate-800 font-semibold mb-1">中国高校校办产业协会</div>
                 <p className="text-slate-600 leading-relaxed text-[11px]">
-                  秘书处为专委会常设日常执行管理机构，在理事会和秘书长统一领导下规范运转，承担协会赋予的日常联络、项目协调、综合服务等职责。
+                  秘书处为国专委常设日常执行管理机构，在理事会和秘书长统一领导下规范运转，承担协会赋予的日常联络、项目协调、综合服务等职责。
                 </p>
               </div>
 
@@ -562,23 +578,23 @@ export default function GuozhuanweiGaikuangPage() {
                 },
                 {
                   time: "2025年11月",
-                  title: "专委会成立大会在京隆重召开",
+                  title: "国专委成立大会在京隆重召开",
                   desc: "中国高校校办产业协会国际合作与交流专业委员会成立大会在京举行，选举产生第一届理事会与领导班子。",
                 },
                 {
                   time: "2025年06月",
                   title: "筹备组赴海外高校开展跨境转化调研",
-                  desc: "专委会筹备组赴欧洲及“一带一路”多国高校调研，就跨国技术转移互认与国际联合实验室达成合作备忘录。",
+                  desc: "国专委筹备组赴欧洲及“一带一路”多国高校调研，就跨国技术转移互认与国际联合实验室达成合作备忘录。",
                 },
                 {
                   time: "2024年12月",
-                  title: "协会正式批准设立专委会批复文件",
+                  title: "协会正式批准设立国专委批复文件",
                   desc: "中国高校校办产业协会理事会全票审议通过设立决议，正式下发校产协发〔2024〕18号批复文件。",
                 },
                 {
                   time: "2024年08月",
                   title: "全国重点高校科技园联合签署筹备倡议书",
-                  desc: "全国三十余所重点高校国家大学科技园与骨干校办企业联合签署倡议书，正式启动专委会筹备工作。",
+                  desc: "全国三十余所重点高校国家大学科技园与骨干校办企业联合签署倡议书，正式启动国专委筹备工作。",
                 },
               ].map((item, idx) => (
                 <div key={idx} className="relative group">
@@ -694,60 +710,79 @@ export default function GuozhuanweiGaikuangPage() {
                   会员高校、企事业单位代表可在线提交业务咨询，工作人员将于1个工作日内与您联系。
                 </p>
 
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    alert("您的诉求已成功提交至秘书处，工作人员将在1个工作日内联系您。");
-                  }}
-                  className="space-y-3.5 text-xs"
-                >
-                  <div>
-                    <label className="block text-slate-700 font-medium mb-1">联系人姓名 / 职务</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="例如：李处长 / 科技产业处"
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
-                    />
+                {inquirySent ? (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2 text-emerald-900">
+                    <div className="font-bold flex items-center space-x-1.5 text-sm text-emerald-800">
+                      <span>✓</span>
+                      <span>诉求提交成功</span>
+                    </div>
+                    <p className="text-emerald-700 leading-relaxed">
+                      您的业务咨询与诉求已成功录入国专委秘书处流转系统，工作人员将在1个工作日内联系您。
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setInquirySent(false)}
+                      className="mt-2 text-xs font-semibold text-emerald-800 underline cursor-pointer"
+                    >
+                      重新填写或继续咨询
+                    </button>
                   </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-medium mb-1">所属高校或单位名称</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="例如：某重点大学科技开发部"
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-medium mb-1">联系电话 / 电子邮箱</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="用于接收秘书处回复"
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 font-medium mb-1">咨询合作诉求概述</label>
-                    <textarea
-                      rows={3}
-                      required
-                      placeholder="请简要描述您需咨询的成果对接、会员入会或国际交流事宜..."
-                      className="w-full px-3.5 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50 resize-none"
-                    ></textarea>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setInquirySent(true);
+                    }}
+                    className="space-y-3.5 text-xs"
                   >
-                    提交咨询与对接申请
-                  </button>
-                </form>
+                    <div>
+                      <label className="block text-slate-700 font-medium mb-1">联系人姓名 / 职务</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="例如：李处长 / 科技产业处"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-medium mb-1">所属高校或单位名称</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="例如：某重点大学科技开发部"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-medium mb-1">联系电话 / 电子邮箱</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="用于接收秘书处回复"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-700 font-medium mb-1">咨询合作诉求概述</label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="请简要描述您需咨询的成果对接、会员入会或国际交流事宜..."
+                        className="w-full px-3.5 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 bg-slate-50/50 resize-none"
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+                    >
+                      提交咨询与对接申请
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           </div>

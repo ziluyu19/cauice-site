@@ -1,63 +1,78 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface ProjectItem {
+  id: string;
+  name: string;
+  country: string;
+  field: string;
+  chineseParty: string;
+  foreignParty: string;
+  period: string;
+  status: string;
+  desc?: string;
+  year?: string;
+  createdAt?: any;
+}
 
 export default function InternationalPage() {
-  const [activeTab, setActiveTab] = useState<string>("projects");
-  const [filterCountry, setFilterCountry] = useState<string>("全部");
-  const [filterField, setFilterField] = useState<string>("全部");
-  const [filterYear, setFilterYear] = useState<string>("全部");
-  const [filterStatus, setFilterStatus] = useState<string>("全部");
-  const [briTab, setBriTab] = useState<"policy" | "project" | "activity" | "achievement">("policy");
-  const [activityTypeFilter, setActivityTypeFilter] = useState<string>("全部");
+  const [activeTab, setActiveTab] = useState<string>('projects');
+  const [filterCountry, setFilterCountry] = useState<string>('全部');
+  const [filterField, setFilterField] = useState<string>('全部');
+  const [filterStatus, setFilterStatus] = useState<string>('全部');
+  const [briTab, setBriTab] = useState<'policy' | 'project' | 'activity' | 'achievement'>('policy');
+  const [activityTypeFilter, setActivityTypeFilter] = useState<string>('全部');
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false);
 
-  // 项目库模拟数据
-  const mockProjects = [
-    {
-      id: 1,
-      name: "中德智能工业机器人联合概念验证中心与技术转移项目",
-      chineseParty: "清华大学科技开发部 / 北京某智能控制技术有限公司",
-      foreignParty: "德国慕尼黑工业大学自动化技术研究所 (TUM)",
-      period: "2024.03 - 2026.12",
-      status: "进行中",
-      country: "德国",
-      field: "智能制造",
-      year: "2024",
-      desc: "围绕高精度协同工业机械臂控制算法开展联合验证，并在长三角国家大学科技园设立离岸协同中试线。",
-    },
-    {
-      id: 2,
-      name: "中新高校纳米新材料与绿色储能器件跨境联合研发转化工程",
-      chineseParty: "浙江大学工业技术转化研究院",
-      foreignParty: "新加坡南洋理工大学能源研究院 (NTU ERI@N)",
-      period: "2025.01 - 2027.06",
-      status: "筹备中",
-      country: "新加坡",
-      field: "新能源",
-      year: "2025",
-      desc: "聚焦固态电解质与新型高能量密度电池组装工艺，打造面向东盟市场的绿色能源出海应用基地。",
-    },
-    {
-      id: 3,
-      name: "中英精准医疗与生物靶向药物跨境知识产权赋权转化平台",
-      chineseParty: "复旦大学上海医学院科技成果转化中心",
-      foreignParty: "英国牛津大学创新中心 (Oxford University Innovation)",
-      period: "2023.09 - 2025.08",
-      status: "已完成",
-      country: "英国",
-      field: "生物医药",
-      year: "2023",
-      desc: "完成多项跨国PCT专利布局互认与抗体先导化合物跨境商业许可授权，成果已进入临床II期孵化。",
-    },
-  ];
+  // Firestore 真实项目库数据状态
+  const [projectsList, setProjectsList] = useState<ProjectItem[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [viewingProject, setViewingProject] = useState<ProjectItem | null>(null);
 
-  const filteredProjects = mockProjects.filter((p) => {
-    if (filterCountry !== "全部" && p.country !== filterCountry) return false;
-    if (filterField !== "全部" && p.field !== filterField) return false;
-    if (filterYear !== "全部" && p.year !== filterYear) return false;
-    if (filterStatus !== "全部" && p.status !== filterStatus) return false;
+  // 实时订阅 projects 集合
+  useEffect(() => {
+    let unsubscribe: () => void = () => {};
+
+    try {
+      const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+      unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const list: ProjectItem[] = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<ProjectItem, 'id'>),
+          }));
+          setProjectsList(list);
+          setLoadingProjects(false);
+        },
+        (err) => {
+          console.warn('Projects query fallback to basic snapshot:', err);
+          unsubscribe = onSnapshot(collection(db, 'projects'), (snapshot) => {
+            const list: ProjectItem[] = snapshot.docs.map((docSnap) => ({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<ProjectItem, 'id'>),
+            }));
+            setProjectsList(list);
+            setLoadingProjects(false);
+          });
+        }
+      );
+    } catch (e) {
+      console.error('Failed to setup projects listener:', e);
+      setLoadingProjects(false);
+    }
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredProjects = projectsList.filter((p) => {
+    if (filterCountry !== '全部' && p.country !== filterCountry) return false;
+    if (filterField !== '全部' && p.field !== filterField) return false;
+    if (filterStatus !== '全部' && p.status !== filterStatus) return false;
     return true;
   });
 
@@ -103,7 +118,7 @@ export default function InternationalPage() {
       </section>
 
       {/* 顶部 6 个锚点子导航 */}
-      <div className="sticky top-[148px] sm:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
+      <div className="sticky top-[108px] lg:top-[156px] z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="flex items-center space-x-2 overflow-x-auto py-2.5">
             {subNavItems.map((item) => (
@@ -134,7 +149,7 @@ export default function InternationalPage() {
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">国际合作项目库</h2>
             </div>
             <span className="text-xs text-slate-500">
-              共收录重点高校涉外产业项目，显示 {filteredProjects.length} / {mockProjects.length} 项
+              共收录重点高校涉外产业项目，显示 {filteredProjects.length} / {projectsList.length} 项
             </span>
           </div>
 
@@ -143,14 +158,14 @@ export default function InternationalPage() {
             {/* 国别 */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-slate-500 w-16 shrink-0">合作国别：</span>
-              {["全部", "德国", "新加坡", "英国"].map((item) => (
+              {['全部', '德国', '新加坡', '英国', '瑞士', '日本'].map((item) => (
                 <button
                   key={item}
                   onClick={() => setFilterCountry(item)}
                   className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                     filterCountry === item
-                      ? "bg-blue-800 text-white font-semibold shadow-xs"
-                      : "bg-white text-slate-600 hover:bg-slate-200 border border-slate-200"
+                      ? 'bg-blue-800 text-white font-semibold shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
                   }`}
                 >
                   {item}
@@ -161,32 +176,14 @@ export default function InternationalPage() {
             {/* 领域 */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-slate-500 w-16 shrink-0">专业领域：</span>
-              {["全部", "智能制造", "新能源", "生物医药"].map((item) => (
+              {['全部', '智能制造', '新能源', '生物医药', '数字经济', '新材料'].map((item) => (
                 <button
                   key={item}
                   onClick={() => setFilterField(item)}
                   className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                     filterField === item
-                      ? "bg-blue-800 text-white font-semibold shadow-xs"
-                      : "bg-white text-slate-600 hover:bg-slate-200 border border-slate-200"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            {/* 年度 */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-semibold text-slate-500 w-16 shrink-0">立项年度：</span>
-              {["全部", "2025", "2024", "2023"].map((item) => (
-                <button
-                  key={item}
-                  onClick={() => setFilterYear(item)}
-                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
-                    filterYear === item
-                      ? "bg-blue-800 text-white font-semibold shadow-xs"
-                      : "bg-white text-slate-600 hover:bg-slate-200 border border-slate-200"
+                      ? 'bg-blue-800 text-white font-semibold shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
                   }`}
                 >
                   {item}
@@ -197,14 +194,14 @@ export default function InternationalPage() {
             {/* 状态 */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-slate-500 w-16 shrink-0">进展状态：</span>
-              {["全部", "进行中", "筹备中", "已完成"].map((item) => (
+              {['全部', '进行中', '筹备中', '已完成'].map((item) => (
                 <button
                   key={item}
                   onClick={() => setFilterStatus(item)}
                   className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
                     filterStatus === item
-                      ? "bg-blue-800 text-white font-semibold shadow-xs"
-                      : "bg-white text-slate-600 hover:bg-slate-200 border border-slate-200"
+                      ? 'bg-blue-800 text-white font-semibold shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
                   }`}
                 >
                   {item}
@@ -215,15 +212,21 @@ export default function InternationalPage() {
 
           {/* 项目卡片列表 */}
           <div className="space-y-4">
-            {filteredProjects.length === 0 ? (
+            {loadingProjects ? (
+              <div className="p-12 text-center text-slate-400 space-y-2 text-xs">
+                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <div>正在连接 Firestore 读取合作项目数据...</div>
+              </div>
+            ) : filteredProjects.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400 border border-dashed rounded-lg">
-                未检索到符合筛选条件的项目，请调整筛选维度。
+                未检索到符合筛选条件的涉外项目，可切换筛选或在管理后台录入新项目。
               </div>
             ) : (
               filteredProjects.map((proj) => (
                 <div
                   key={proj.id}
-                  className="p-5 rounded-xl border border-slate-200 hover:border-blue-300 hover:shadow-md transition-all bg-white group space-y-3"
+                  onClick={() => setViewingProject(proj)}
+                  className="p-5 rounded-xl border border-slate-200 hover:border-blue-400 hover:shadow-md transition-all bg-white group space-y-3 cursor-pointer"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="space-y-1">
@@ -231,7 +234,9 @@ export default function InternationalPage() {
                         <span className="text-xs px-2.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-800 border border-blue-200">
                           {proj.country} · {proj.field}
                         </span>
-                        <span className="text-xs text-slate-400">立项：{proj.year}年</span>
+                        {proj.period && (
+                          <span className="text-xs text-slate-400 font-mono">周期：{proj.period}</span>
+                        )}
                       </div>
                       <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-800 transition-colors">
                         {proj.name}
@@ -240,20 +245,22 @@ export default function InternationalPage() {
 
                     <span
                       className={`text-xs font-semibold px-3 py-1 rounded-full shrink-0 ${
-                        proj.status === "进行中"
-                          ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          : proj.status === "筹备中"
-                          ? "bg-amber-100 text-amber-800 border border-amber-200"
-                          : "bg-slate-100 text-slate-700 border border-slate-200"
+                        proj.status === '进行中'
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : proj.status === '筹备中'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                     >
                       {proj.status}
                     </span>
                   </div>
 
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    {proj.desc}
-                  </p>
+                  {proj.desc && (
+                    <p className="text-xs sm:text-sm text-slate-600 leading-relaxed line-clamp-2">
+                      {proj.desc}
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-100">
                     <div>
@@ -263,14 +270,6 @@ export default function InternationalPage() {
                     <div>
                       <span className="text-slate-400">外方合作主体：</span>
                       <span className="font-medium text-slate-800">{proj.foreignParty}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">合作起止周期：</span>
-                      <span className="font-mono text-slate-700">{proj.period}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">合作模式：</span>
-                      <span className="text-slate-700">产学研联合技术验证与离岸转移</span>
                     </div>
                   </div>
                 </div>
@@ -364,7 +363,7 @@ export default function InternationalPage() {
           </div>
 
           {/* 4 个 Tabs */}
-          <div className="flex space-x-2 border-b border-slate-200">
+          <div className="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px">
             {[
               { id: "policy", label: "政策指引" },
               { id: "project", label: "沿线示范项目" },

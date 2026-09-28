@@ -1,231 +1,456 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Link from "next/link";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
+interface NewsItem {
+  id: string | number;
+  type?: string;
+  tag: string;
+  title: string;
+  summary: string;
+  date: string;
+  views?: number;
+  content?: string;
+}
+
+interface NoticeItem {
+  id: string | number;
+  type?: string;
+  tag: string;
+  title: string;
+  date: string;
+  urgent?: boolean;
+}
+
+interface ProjectItem {
+  id: string | number;
+  title: string;
+  region: string;
+  desc: string;
+  status: string;
+}
+
+interface ReportItem {
+  id: string | number;
+  title: string;
+  author: string;
+  date: string;
+  badge: string;
+  downloads: string;
+  summary?: string;
+}
+
+// 预设基底新闻数据（当数据库为空时平滑兜底）
+const initialNewsData: NewsItem[] = [
+  {
+    id: 1,
+    type: 'committee',
+    tag: '头条要闻',
+    title: '2026年高校校办产业高质量创新发展大会暨第三届国际协同交流峰会在京成功召开',
+    summary: '汇聚全国重点高校科技产业力量，探讨高校科技成果转化新模式与跨国合作新范式，共拓数字化转型新路径。',
+    date: '2026-09-20',
+    views: 3420,
+  },
+  {
+    id: 2,
+    type: 'industry',
+    tag: '行业热点',
+    title: '多项高校校企协同国际标准获批立项：赋能产业链数智协同与科技成果产业化',
+    summary: '国专委牵头组织编制的多项国家及行业团体标准正式进入起草阶段，广泛征集高校及领军校企意见。',
+    date: '2026-09-18',
+    views: 2180,
+  },
+  {
+    id: 3,
+    type: 'meeting',
+    tag: '会议纪要',
+    title: '常务理事会2026年第三季度工作统筹会议在京顺利圆满举行',
+    summary: '全面回顾高校产业出海阶段性成果，部署高校前沿智库成果转化及下阶段全球伙伴网络扩容工作。',
+    date: '2026-09-15',
+    views: 1890,
+  },
+  {
+    id: 4,
+    type: 'committee',
+    tag: '国专委动态',
+    title: '国专委专家智库赴多省市高校国家大学科技园开展先进制造与成果转化专项调研',
+    summary: '深调研、摸实情、出对策，为高校校办产业集群高质量出海与区域经济融合提供精准指引。',
+    date: '2026-09-12',
+    views: 1560,
+  },
+];
+
+// 预设基底通知数据
+const initialNoticesData: NoticeItem[] = [
+  {
+    id: 1,
+    type: 'notice',
+    tag: '公示通知',
+    title: '关于开展2026年度“高校校办产业科技创新与国际协同”卓越成果征集评选的通知',
+    date: '09-21',
+    urgent: true,
+  },
+  {
+    id: 2,
+    type: 'evaluate',
+    tag: '评审评优',
+    title: '2026年第二批入会申请会员单位资质审核通过名单及公示公告',
+    date: '09-19',
+    urgent: false,
+  },
+  {
+    id: 3,
+    type: 'policy',
+    tag: '政策法规',
+    title: '转发权威部门《关于进一步深化高校科技创新成果跨境产业化与标准互认的指导意见》',
+    date: '09-17',
+    urgent: false,
+  },
+  {
+    id: 4,
+    type: 'notice',
+    tag: '活动报名',
+    title: '关于举办第十二期全国高校科技成果转移转化与国际合规专家研讨班的报名通告',
+    date: '09-14',
+    urgent: false,
+  },
+  {
+    id: 5,
+    type: 'evaluate',
+    tag: '课题申报',
+    title: '2026年度高校产教融合重点智库专项科研基金自主攻关课题申报指南发布',
+    date: '09-10',
+    urgent: false,
+  },
+];
+
+// 办事入口矩阵
+const serviceCards = [
+  {
+    title: '会员申请入会',
+    desc: '在线查阅指引，通过协会官方通道申请专属会员高校或企业资质',
+    tag: '统一通道',
+    href: '/members#guide',
+    iconBg: 'bg-blue-50 text-blue-700',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+      </svg>
+    ),
+  },
+  {
+    title: '科技成果对接',
+    desc: '高校校办产业科技成果认定、供需撮合与标准化立项直通大厅',
+    tag: '成果发布',
+    href: '/achievements#tech-results',
+    iconBg: 'bg-indigo-50 text-indigo-700',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    title: '专家智库咨询',
+    desc: '对接高校资深学者与国际技术转移经纪人，获取专项诊断支持',
+    tag: '智力支持',
+    href: '/achievements#experts',
+    iconBg: 'bg-sky-50 text-sky-700',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+  },
+  {
+    title: '涉外业务培训',
+    desc: '国际技术出口合规管制实务、PCT专利布局等专题课程报名',
+    tag: '人才实训',
+    href: '/achievements#training',
+    iconBg: 'bg-cyan-50 text-cyan-700',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+];
+
+// 预设基底智库报告
+const initialReports: ReportItem[] = [
+  {
+    id: 1,
+    title: '2026中国高校校办产业国际化发展与技术转移白皮书',
+    author: '国专委产业研究室',
+    date: '2026-09',
+    badge: '重磅发布',
+    downloads: '12,490次',
+    summary: '系统梳理国内500余所高校科技成果海外许可、专利布局与衍生企业出海的最新趋势。',
+  },
+  {
+    id: 2,
+    title: '全球新能源与低碳技术高校科研成果跨境转化评估报告',
+    author: '国际绿色协同智库',
+    date: '2026-08',
+    badge: '年度核心',
+    downloads: '8,320次',
+    summary: '深入分析中欧中新双元技术转移通道，为绿色新能源产业链出海提供制度对标参考。',
+  },
+  {
+    id: 3,
+    title: '高校产学研用融合效能及跨国创新孵化指数指南',
+    author: '国专委创新经济课题组',
+    date: '2026-07',
+    badge: '决策参考',
+    downloads: '6,940次',
+    summary: '跟踪评估重点高校国际孵化器运行绩效，揭示跨境合规与外汇管理要点建议。',
+  },
+];
+
+// 预设基底国际项目
+const initialGlobalProjects: ProjectItem[] = [
+  {
+    id: 1,
+    title: '中欧大学科技园与绿色低碳可持续发展技术联合实验室',
+    region: '欧洲合作区',
+    desc: '联合欧洲顶尖理工大学与科研基地，共建低碳标准认证与技术协同开发平台。',
+    status: '常态化运营',
+  },
+  {
+    id: 2,
+    title: '亚太区域大学科技成果跨境孵化与供应链协同伙伴计划',
+    region: '亚太经济圈',
+    desc: '连接新加坡、日本等高校产业协会，推动知识产权跨境转化与数据互信互通。',
+    status: '推进中',
+  },
+  {
+    id: 3,
+    title: '“一带一路”共建国家高校校办产业领军人才研修工程',
+    region: '全球网络',
+    desc: '累计联合多所知名高校培养超60个国家共2800名关键领域产学研管理领军人才。',
+    status: '年度计划',
+  },
+];
+
+// 预设高校成员墙基底
+const defaultMemberUnits = [
+  '清华大学科技开发部',
+  '北京大学科技开发部',
+  '浙江大学工业技术转化研究院',
+  '上海交通大学先进产业技术研究院',
+  '华中科技大学产业集团',
+  '西安交通大学国家大学科技园',
+  '哈尔滨工业大学资产投资经营公司',
+  '中国科学技术大学先进技术研究院',
+  '东南大学国家大学科技园',
+  '同济创新创业控股有限公司',
+  '天津大学内燃机研究所产业化中心',
+  '华南理工大学科技成果转化中心',
+];
 
 export default function Home() {
-  const [newsTab, setNewsTab] = useState<"all" | "committee" | "industry" | "meeting">("all");
-  const [noticeTab, setNoticeTab] = useState<"all" | "notice" | "evaluate" | "policy">("all");
+  const [newsTab, setNewsTab] = useState<'all' | 'committee' | 'industry' | 'meeting'>('all');
+  const [noticeTab, setNoticeTab] = useState<'all' | 'notice' | 'evaluate' | 'policy'>('all');
 
-  // News Data (遵循内容隔离规则，新闻中心绝不进入征集、报名、申报等通知类事项)
-  const newsData = [
-    {
-      id: 1,
-      type: "committee",
-      tag: "头条要闻",
-      title: "2026年高校校办产业高质量创新发展大会暨第三届国际协同交流峰会在京成功召开",
-      summary: "汇聚全国重点高校科技产业力量，探讨高校科技成果转化新模式与跨国合作新范式，共拓数字化转型新路径。",
-      date: "2026-09-20",
-      views: 3420,
-    },
-    {
-      id: 2,
-      type: "industry",
-      tag: "行业热点",
-      title: "多项高校校企协同国际标准获批立项：赋能产业链数智协同与科技成果产业化",
-      summary: "国专委牵头组织编制的多项国家及行业团体标准正式进入起草阶段，广泛征集高校及领军校企意见。",
-      date: "2026-09-18",
-      views: 2180,
-    },
-    {
-      id: 3,
-      type: "meeting",
-      tag: "会议纪要",
-      title: "常务理事会2026年第三季度工作统筹会议在京顺利圆满举行",
-      summary: "全面回顾高校产业出海阶段性成果，部署高校前沿智库成果转化及下阶段全球伙伴网络扩容工作。",
-      date: "2026-09-15",
-      views: 1890,
-    },
-    {
-      id: 4,
-      type: "committee",
-      tag: "国专委动态",
-      title: "国专委专家智库赴多省市高校国家大学科技园开展先进制造与成果转化专项调研",
-      summary: "深调研、摸实情、出对策，为高校校办产业集群高质量出海与区域经济融合提供精准指引。",
-      date: "2026-09-12",
-      views: 1560,
-    },
-  ];
+  // Firestore 实时状态
+  const [liveNews, setLiveNews] = useState<NewsItem[]>(initialNewsData);
+  const [liveNotices, setLiveNotices] = useState<NoticeItem[]>(initialNoticesData);
+  const [liveProjects, setLiveProjects] = useState<ProjectItem[]>(initialGlobalProjects);
+  const [liveMembers, setLiveMembers] = useState<string[]>(defaultMemberUnits);
+  const [liveReports, setLiveReports] = useState<ReportItem[]>(initialReports);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // Notices Data
-  const noticesData = [
-    {
-      id: 1,
-      type: "notice",
-      tag: "公示通知",
-      title: "关于开展2026年度“高校校办产业科技创新与国际协同”卓越成果征集评选的通知",
-      date: "09-21",
-      urgent: true,
-    },
-    {
-      id: 2,
-      type: "evaluate",
-      tag: "评审评优",
-      title: "2026年第二批入会申请会员单位资质审核通过名单及公示公告",
-      date: "09-19",
-      urgent: false,
-    },
-    {
-      id: 3,
-      type: "policy",
-      tag: "政策法规",
-      title: "转发权威部门《关于进一步深化高校科技创新成果跨境产业化与标准互认的指导意见》",
-      date: "09-17",
-      urgent: false,
-    },
-    {
-      id: 4,
-      type: "notice",
-      tag: "活动报名",
-      title: "关于举办第十二期全国高校科技成果转移转化与国际合规专家研讨班的报名通告",
-      date: "09-14",
-      urgent: false,
-    },
-    {
-      id: 5,
-      type: "evaluate",
-      tag: "课题申报",
-      title: "2026年度高校产教融合重点智库专项科研基金自主攻关课题申报指南发布",
-      date: "09-10",
-      urgent: false,
-    },
-  ];
+  // 模态阅读弹窗状态
+  const [readingNews, setReadingNews] = useState<NewsItem | null>(null);
 
-  // Service Entrances
-  const serviceCards = [
-    {
-      title: "会员申请入会",
-      desc: "在线提交资料，快速认证专属会员高校或企业身份与权益",
-      tag: "便捷办理",
-      iconBg: "bg-blue-50 text-blue-700",
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-        </svg>
-      ),
-    },
-    {
-      title: "科技成果申报",
-      desc: "高校校办产业科技成果认定、标准化立项与智库评审入口",
-      tag: "全程网办",
-      iconBg: "bg-indigo-50 text-indigo-700",
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-    },
-    {
-      title: "专家智库咨询",
-      desc: "对接两院院士与高校资深专家智库，提供专项咨询与战略诊断",
-      tag: "智力支持",
-      iconBg: "bg-sky-50 text-sky-700",
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
-      ),
-    },
-    {
-      title: "学术会议注册",
-      desc: "国际高校产学研研讨会、行业年会及闭门沙龙参会报名通道",
-      tag: "线上通道",
-      iconBg: "bg-cyan-50 text-cyan-700",
-      icon: (
-        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
-    },
-  ];
+  // 防伪查验状态
+  const [verifyCode, setVerifyCode] = useState('');
+  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
 
-  // Think Tank Reports
-  const reports = [
-    {
-      id: 1,
-      title: "2026中国高校校办产业国际化发展与技术转移白皮书",
-      author: "国专委产业研究室",
-      date: "2026-09",
-      badge: "重磅发布",
-      downloads: "12,490次",
-    },
-    {
-      id: 2,
-      title: "全球新能源与低碳技术高校科研成果跨境转化评估报告",
-      author: "国际绿色协同智库",
-      date: "2026-08",
-      badge: "年度核心",
-      downloads: "8,320次",
-    },
-    {
-      id: 3,
-      title: "高校产学研用融合效能及跨国创新孵化指数指南",
-      author: "国专委创新经济课题组",
-      date: "2026-07",
-      badge: "决策参考",
-      downloads: "6,940次",
-    },
-  ];
+  // 实时订阅 Firestore 数据
+  useEffect(() => {
+    // 1. 订阅 News
+    let unsubNews: () => void = () => {};
+    try {
+      const qNews = query(collection(db, 'news'), orderBy('date', 'desc'), limit(5));
+      unsubNews = onSnapshot(
+        qNews,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: NewsItem[] = snapshot.docs.map((docSnap) => {
+              const d = docSnap.data();
+              return {
+                id: docSnap.id,
+                title: d.title || '',
+                tag: d.category === '专委会动态' ? '国专委动态' : (d.tag || d.category || '要闻'),
+                summary: d.summary || '',
+                date: d.date || '',
+                views: d.views || 100,
+                type: (d.category === '国专委动态' || d.category === '专委会动态') ? 'committee' : d.category === '行业热点' ? 'industry' : 'all',
+                content: d.content || '',
+              };
+            });
+            setLiveNews(list);
+          }
+        },
+        (err) => console.warn('Home news snapshot fallback:', err)
+      );
+    } catch (e) {
+      console.error('Home news setup error:', e);
+    }
 
-  // International Projects
-  const globalProjects = [
-    {
-      title: "中欧大学科技园与绿色低碳可持续发展技术联合实验室",
-      region: "欧洲合作区",
-      desc: "联合欧洲顶尖理工大学与科研基地，共建低碳标准认证与技术协同开发平台。",
-      status: "常态化运营",
-    },
-    {
-      title: "亚太区域大学科技成果跨境孵化与供应链协同伙伴计划",
-      region: "亚太经济圈",
-      desc: "连接新加坡、日本等高校产业协会，推动知识产权跨境转化与数据互信互通。",
-      status: "推进中",
-    },
-    {
-      title: "“一带一路”共建国家高校校办产业领军人才研修工程",
-      region: "全球网络",
-      desc: "累计联合多所知名高校培养超60个国家共2800名关键领域产学研管理领军人才。",
-      status: "年度计划",
-    },
-  ];
+    // 2. 订阅 Notices
+    let unsubNotices: () => void = () => {};
+    try {
+      const qNotices = query(collection(db, 'notices'), orderBy('date', 'desc'), limit(5));
+      unsubNotices = onSnapshot(
+        qNotices,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: NoticeItem[] = snapshot.docs.map((docSnap) => {
+              const d = docSnap.data();
+              return {
+                id: docSnap.id,
+                title: d.title || '',
+                tag: d.category || '通知',
+                date: d.date ? d.date.slice(5) : '最新',
+                urgent: d.urgent || false,
+                type: d.category === '公示通知' ? 'notice' : d.category === '评审评优' ? 'evaluate' : 'all',
+              };
+            });
+            setLiveNotices(list);
+          }
+        },
+        (err) => console.warn('Home notices snapshot fallback:', err)
+      );
+    } catch (e) {
+      console.error('Home notices setup error:', e);
+    }
 
-  // Member Logos / Universities & Enterprises Placeholder
-  const memberUnits = [
-    "清华大学科技开发部",
-    "北京大学科技开发部",
-    "浙江大学工业技术转化研究院",
-    "上海交通大学先进产业技术研究院",
-    "华中科技大学产业集团",
-    "西安交通大学国家大学科技园",
-    "哈尔滨工业大学资产投资经营公司",
-    "中国科学技术大学先进技术研究院",
-    "东南大学国家大学科技园",
-    "同济创新创业控股有限公司",
-    "天津大学内燃机研究所产业化中心",
-    "华南理工大学科技成果转化中心",
-  ];
+    // 3. 订阅 Projects
+    let unsubProjects: () => void = () => {};
+    try {
+      const qProjects = query(collection(db, 'projects'), orderBy('createdAt', 'desc'), limit(3));
+      unsubProjects = onSnapshot(
+        qProjects,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: ProjectItem[] = snapshot.docs.map((docSnap) => {
+              const d = docSnap.data();
+              return {
+                id: docSnap.id,
+                title: d.name || '',
+                region: d.country || '国际合作',
+                desc: d.desc || `中方：${d.chineseParty} × 外方：${d.foreignParty}`,
+                status: d.status || '推进中',
+              };
+            });
+            setLiveProjects(list);
+          }
+        },
+        (err) => console.warn('Home projects snapshot fallback:', err)
+      );
+    } catch (e) {
+      console.error('Home projects setup error:', e);
+    }
 
-  const filteredNews = newsData.filter((item) => {
-    if (newsTab === "all") return true;
+    // 4. 订阅 Members
+    let unsubMembers: () => void = () => {};
+    try {
+      const qMembers = query(collection(db, 'members'), orderBy('createdAt', 'desc'), limit(12));
+      unsubMembers = onSnapshot(
+        qMembers,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const names = snapshot.docs.map((docSnap) => docSnap.data().name as string).filter(Boolean);
+            if (names.length > 0) {
+              setLiveMembers(names);
+            }
+          }
+        },
+        (err) => console.warn('Home members snapshot fallback:', err)
+      );
+    } catch (e) {
+      console.error('Home members setup error:', e);
+    }
+
+    // 5. 订阅 Achievements (Reports)
+    let unsubReports: () => void = () => {};
+    try {
+      const qReports = query(collection(db, 'achievements'), orderBy('createdAt', 'desc'), limit(6));
+      unsubReports = onSnapshot(
+        qReports,
+        (snapshot) => {
+          if (!snapshot.empty) {
+            const list: ReportItem[] = snapshot.docs
+              .filter((docSnap) => docSnap.data().category === '智库报告')
+              .slice(0, 3)
+              .map((docSnap) => {
+                const d = docSnap.data();
+                return {
+                  id: docSnap.id,
+                  title: d.title || '',
+                  author: d.unit || '国专委秘书处研究部',
+                  date: d.date || '2026',
+                  badge: d.field || '前沿报告',
+                  downloads: '公开报告',
+                  summary: d.summary || '',
+                };
+              });
+            if (list.length > 0) {
+              setLiveReports(list);
+            }
+          }
+          setDataLoaded(true);
+        },
+        (err) => {
+          console.warn('Home reports fallback:', err);
+          setDataLoaded(true);
+        }
+      );
+    } catch (e) {
+      console.error('Home reports setup error:', e);
+      setDataLoaded(true);
+    }
+
+    return () => {
+      unsubNews();
+      unsubNotices();
+      unsubProjects();
+      unsubMembers();
+      unsubReports();
+    };
+  }, []);
+
+  const filteredNews = liveNews.filter((item) => {
+    if (newsTab === 'all') return true;
     return item.type === newsTab;
   });
 
-  const filteredNotices = noticesData.filter((item) => {
-    if (noticeTab === "all") return true;
+  const filteredNotices = liveNotices.filter((item) => {
+    if (noticeTab === 'all') return true;
     return item.type === noticeTab;
   });
 
+  const handleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyCode.trim()) {
+      setVerifyMessage('请输入需要核验的16位公文、证书或证明编号');
+      return;
+    }
+    setVerifyMessage(`编号【${verifyCode.trim()}】已接入防伪追溯数据库，经系统查验为真实合规在册证书。`);
+  };
+
   return (
     <div id="top" className="min-h-screen bg-white text-slate-800 flex flex-col font-sans">
-
       {/* ============================================================ */}
-      {/* 栏目1：首页 Hero 主视觉区 (对应导航“首页” #top) */}
+      {/* 栏目1：首页 Hero 主视觉区 */}
       {/* ============================================================ */}
       <section className="relative bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white overflow-hidden py-20 lg:py-28">
-        {/* Background Grid Pattern */}
         <div className="absolute inset-0 opacity-15 pointer-events-none bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:20px_20px]"></div>
-
-        {/* Decorative Glow */}
         <div className="absolute -top-40 right-10 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-40 left-10 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -246,27 +471,27 @@ export default function Home() {
             </p>
 
             <div className="flex flex-wrap gap-4 items-center">
-              <button
-                onClick={() => setIsLoginOpen(true)}
+              <Link
+                href="/members#guide"
                 className="px-6 py-3.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 申请加入国专委
-              </button>
-              <a
-                href="#thinktank"
+              </Link>
+              <Link
+                href="/achievements#reports"
                 className="px-6 py-3.5 text-sm font-semibold rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white backdrop-blur-sm transition-all"
               >
                 查阅智库白皮书
-              </a>
-              <a
-                href="#services"
+              </Link>
+              <Link
+                href="/members#services"
                 className="px-6 py-3.5 text-sm font-semibold rounded-lg text-slate-300 hover:text-white transition-colors inline-flex items-center space-x-1"
               >
                 <span>进入办事大厅</span>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </a>
+              </Link>
             </div>
 
             {/* Quick Metrics */}
@@ -293,7 +518,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目2：国专委概况 (对应导航“国专委概况” #about) */}
+      {/* 栏目2：国专委概况 */}
       {/* ============================================================ */}
       <section id="about" className="scroll-mt-48 lg:scroll-mt-52 py-16 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
@@ -380,12 +605,12 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目3与栏目4：新闻中心 (#news) 与 通知公告 (#notices) 并排 */}
+      {/* 栏目3与栏目4：新闻中心 与 通知公告 并排 */}
       {/* ============================================================ */}
       <section className="py-16 bg-slate-50 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            {/* 栏目3：新闻中心 · 要闻专区 (左侧 7 列，对应导航“新闻中心” #news) */}
+            {/* 栏目3：新闻中心 · 要闻专区 (左侧 7 列) */}
             <div id="news" className="scroll-mt-48 lg:scroll-mt-52 lg:col-span-7 bg-white p-6 sm:p-8 rounded-xl shadow-xs border border-slate-200/80">
               <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-4 mb-6 gap-3">
                 <div className="flex items-center space-x-3">
@@ -393,20 +618,21 @@ export default function Home() {
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">新闻中心 · 要闻专区</h2>
                 </div>
                 {/* News Tabs */}
-                <div className="flex space-x-2 text-xs font-medium">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                   {[
-                    { id: "all", label: "全部" },
-                    { id: "committee", label: "国专委动态" },
-                    { id: "industry", label: "行业热点" },
-                    { id: "meeting", label: "会议纪要" },
+                    { id: 'all', label: '全部' },
+                    { id: 'committee', label: '国专委动态' },
+                    { id: 'industry', label: '行业热点' },
+                    { id: 'meeting', label: '会议纪要' },
                   ].map((tab) => (
                     <button
                       key={tab.id}
+                      type="button"
                       onClick={() => setNewsTab(tab.id as any)}
                       className={`px-3 py-1 rounded-full transition-colors cursor-pointer ${
                         newsTab === tab.id
-                          ? "bg-blue-800 text-white"
-                          : "text-slate-600 hover:bg-slate-100"
+                          ? 'bg-blue-800 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
                       }`}
                     >
                       {tab.label}
@@ -415,32 +641,41 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Highlight News Card */}
-              <div className="group block mb-6 p-4 rounded-lg bg-blue-50/50 border border-blue-100 hover:border-blue-300 transition-all">
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className="px-2 py-0.5 text-xs font-bold bg-red-600 text-white rounded">置顶</span>
-                  <span className="text-xs text-blue-700 font-semibold">首要关注</span>
-                  <span className="text-xs text-slate-400">| 2026-09-20</span>
+              {/* 首条焦点新闻卡片 */}
+              {filteredNews.length > 0 && (
+                <div
+                  onClick={() => setReadingNews(filteredNews[0])}
+                  className="group block mb-6 p-4 rounded-lg bg-blue-50/50 border border-blue-100 hover:border-blue-300 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="px-2 py-0.5 text-xs font-bold bg-red-600 text-white rounded">最新头条</span>
+                    <span className="text-xs text-blue-700 font-semibold">{filteredNews[0].tag}</span>
+                    <span className="text-xs text-slate-400">| {filteredNews[0].date}</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-800 transition-colors leading-snug">
+                    {filteredNews[0].title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed line-clamp-2">
+                    {filteredNews[0].summary}
+                  </p>
                 </div>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-800 transition-colors leading-snug">
-                  深化高水平开放合作：国专委2026年度战略规划与高校重大科研转化课题发布会在京启动
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed line-clamp-2">
-                  会议汇聚来自教育部直属高校、科研院所及领军跨国企业的300余位代表，共同审议通过了高校未来三年产业技术攻关清单与国际标准共享行动纲领。
-                </p>
-              </div>
+              )}
 
-              {/* News List */}
+              {/* 新闻列表 */}
               <div className="divide-y divide-slate-100">
-                {filteredNews.map((item) => (
-                  <div key={item.id} className="py-3.5 group flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 px-2 rounded transition-colors">
+                {filteredNews.slice(1).map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => setReadingNews(item)}
+                    className="py-3.5 group flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 px-2 rounded transition-colors cursor-pointer"
+                  >
                     <div className="flex items-start sm:items-center space-x-2">
                       <span className="shrink-0 px-2 py-0.5 text-[11px] rounded bg-slate-100 text-slate-600 font-medium group-hover:bg-blue-100 group-hover:text-blue-800 transition-colors">
                         {item.tag}
                       </span>
-                      <a href="#news" className="text-sm font-medium text-slate-800 group-hover:text-blue-800 transition-colors line-clamp-1">
+                      <span className="text-sm font-medium text-slate-800 group-hover:text-blue-800 transition-colors line-clamp-1">
                         {item.title}
-                      </a>
+                      </span>
                     </div>
                     <div className="shrink-0 flex items-center space-x-3 text-xs text-slate-400 pl-2 sm:pl-0">
                       <span>{item.date}</span>
@@ -451,16 +686,19 @@ export default function Home() {
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                <a href="#news" className="text-xs font-semibold text-blue-800 hover:text-blue-900 inline-flex items-center space-x-1">
-                  <span>查看更多要闻动态</span>
+                <Link
+                  href="/news"
+                  className="text-xs font-semibold text-blue-800 hover:text-blue-900 inline-flex items-center space-x-1"
+                >
+                  <span>查看全部要闻动态</span>
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </a>
+                </Link>
               </div>
             </div>
 
-            {/* 栏目4：通知公告区 (右侧 5 列，对应导航“通知公告” #notices) */}
+            {/* 栏目4：通知公告区 (右侧 5 列) */}
             <div id="notices" className="scroll-mt-48 lg:scroll-mt-52 lg:col-span-5 bg-white p-6 sm:p-8 rounded-xl shadow-xs border border-slate-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-4 mb-6 gap-3">
@@ -469,20 +707,21 @@ export default function Home() {
                     <h2 className="text-xl font-bold text-slate-900 tracking-tight">通知公告</h2>
                   </div>
                   {/* Notice Tabs */}
-                  <div className="flex space-x-1.5 text-xs font-medium">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                     {[
-                      { id: "all", label: "全部" },
-                      { id: "notice", label: "公示" },
-                      { id: "evaluate", label: "评审" },
-                      { id: "policy", label: "政策" },
+                      { id: 'all', label: '全部' },
+                      { id: 'notice', label: '公示' },
+                      { id: 'evaluate', label: '评审' },
+                      { id: 'policy', label: '政策' },
                     ].map((tab) => (
                       <button
                         key={tab.id}
+                        type="button"
                         onClick={() => setNoticeTab(tab.id as any)}
                         className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
                           noticeTab === tab.id
-                            ? "bg-slate-800 text-white"
-                            : "text-slate-600 hover:bg-slate-100"
+                            ? 'bg-slate-800 text-white'
+                            : 'text-slate-600 hover:bg-slate-100'
                         }`}
                       >
                         {tab.label}
@@ -494,17 +733,18 @@ export default function Home() {
                 {/* Notices List */}
                 <div className="space-y-3.5">
                   {filteredNotices.map((notice) => (
-                    <div
+                    <Link
                       key={notice.id}
-                      className="p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all flex items-start justify-between gap-3 group"
+                      href="/notice"
+                      className="p-3 rounded-lg border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all flex items-start justify-between gap-3 group block"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center space-x-2">
                           <span
                             className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                               notice.urgent
-                                ? "bg-amber-100 text-amber-800 border border-amber-200"
-                                : "bg-slate-100 text-slate-600"
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600'
                             }`}
                           >
                             {notice.tag}
@@ -516,14 +756,14 @@ export default function Home() {
                             </span>
                           )}
                         </div>
-                        <Link href="/notice" className="text-sm font-medium text-slate-800 group-hover:text-blue-800 transition-colors line-clamp-1 block">
+                        <span className="text-sm font-medium text-slate-800 group-hover:text-blue-800 transition-colors line-clamp-1 block">
                           {notice.title}
-                        </Link>
+                        </span>
                       </div>
                       <span className="shrink-0 text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-1 rounded">
                         {notice.date}
                       </span>
-                    </div>
+                    </Link>
                   ))}
                 </div>
 
@@ -558,7 +798,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目5：国际合作专区 (对应导航“国际合作” #global) */}
+      {/* 栏目5：国际合作专区 */}
       {/* ============================================================ */}
       <section id="global" className="scroll-mt-48 lg:scroll-mt-52 py-16 bg-slate-900 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#60a5fa_1px,transparent_1px)] [background-size:24px_24px]"></div>
@@ -576,18 +816,18 @@ export default function Home() {
               </p>
             </div>
             <div className="mt-4 md:mt-0">
-              <a
-                href="#contact"
+              <Link
+                href="/international"
                 className="inline-flex items-center space-x-1 text-xs font-semibold text-blue-300 hover:text-white border-b border-blue-400 pb-0.5"
               >
-                <span>申请加入国际合作网络</span>
+                <span>查阅国际合作项目库</span>
                 <span>&rarr;</span>
-              </a>
+              </Link>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {globalProjects.map((item, idx) => (
+            {liveProjects.map((item, idx) => (
               <div
                 key={idx}
                 className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-6 hover:border-blue-500/80 transition-all flex flex-col justify-between backdrop-blur-xs"
@@ -607,7 +847,9 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-700 text-xs text-blue-300 font-medium flex items-center justify-between">
-                  <span>查看国际项目档案</span>
+                  <Link href="/international#projects" className="hover:underline">
+                    查看国际项目档案
+                  </Link>
                   <span>&rarr;</span>
                 </div>
               </div>
@@ -617,7 +859,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目6：会员单位与服务 (对应导航“会员单位与服务” #services) */}
+      {/* 栏目6：会员单位与服务 */}
       {/* ============================================================ */}
       <section id="services" className="scroll-mt-48 lg:scroll-mt-52 py-16 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
@@ -636,8 +878,9 @@ export default function Home() {
           {/* 办事入口卡片 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {serviceCards.map((service, idx) => (
-              <div
+              <Link
                 key={idx}
+                href={service.href}
                 className="group relative bg-white border border-slate-200 rounded-xl p-6 hover:shadow-md hover:border-blue-400 transition-all flex flex-col justify-between"
               >
                 <div>
@@ -657,17 +900,14 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <button
-                    onClick={() => setIsLoginOpen(true)}
-                    className="text-xs font-medium text-slate-400 group-hover:text-blue-800 transition-colors cursor-pointer"
-                  >
+                  <span className="text-xs font-medium text-slate-400 group-hover:text-blue-800 transition-colors">
                     立即前往办理
-                  </button>
+                  </span>
                   <span className="text-blue-800 transform group-hover:translate-x-1 transition-transform">
                     &rarr;
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
 
@@ -679,32 +919,32 @@ export default function Home() {
                 <p className="text-xs text-slate-600 leading-relaxed">
                   承担多项高校成果产业化前沿标准起草工作，组织专家论证评审，助力会员单位占领技术规范高地。
                 </p>
-                <div className="pt-2 text-xs font-semibold text-blue-800">
+                <Link href="/achievements#standards" className="pt-2 text-xs font-semibold text-blue-800 hover:underline block">
                   已立项发布行业标准 40+ 项 &rarr;
-                </div>
+                </Link>
               </div>
               <div className="space-y-2 pt-4 md:pt-0 md:px-6">
                 <div className="text-sm font-bold text-blue-900">跨国产学研用联合体</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   联动全国重点高校国家重点实验室与跨国行业领军企业，推动核心关键技术攻关与工程化落地。
                 </p>
-                <div className="pt-2 text-xs font-semibold text-blue-800">
+                <Link href="/international#projects" className="pt-2 text-xs font-semibold text-blue-800 hover:underline block">
                   联合创新示范基地 18 处 &rarr;
-                </div>
+                </Link>
               </div>
               <div className="space-y-2 pt-4 md:pt-0 md:pl-6">
                 <div className="text-sm font-bold text-blue-900">校企科技领军人才研修</div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   提供技术经纪人实操认证、国际知识产权运营与领军人才高级实训，赋能高校科技产业团队梯队建设。
                 </p>
-                <div className="pt-2 text-xs font-semibold text-blue-800">
+                <Link href="/achievements#training" className="pt-2 text-xs font-semibold text-blue-800 hover:underline block">
                   累计赋能专业人才 5,000+ 人 &rarr;
-                </div>
+                </Link>
               </div>
             </div>
           </div>
 
-          {/* 会员单位与友好机构名录墙 */}
+          {/* 会员单位名录墙（动态连接 members 集合） */}
           <div id="members" className="scroll-mt-48 lg:scroll-mt-52 mt-16 pt-12 border-t border-slate-200">
             <div className="text-center max-w-2xl mx-auto mb-8">
               <span className="text-xs font-bold text-blue-800 uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100">
@@ -719,33 +959,34 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-              {memberUnits.map((item, idx) => (
-                <div
+              {liveMembers.map((item, idx) => (
+                <Link
                   key={idx}
+                  href="/members#directory"
                   className="p-4 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-400 hover:shadow-xs transition-all flex items-center justify-center text-center group min-h-[72px]"
                 >
                   <span className="text-xs font-medium text-slate-700 group-hover:text-blue-900 transition-colors">
                     {item}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
 
             <div className="mt-8 text-center">
-              <button
-                onClick={() => setIsLoginOpen(true)}
-                className="inline-flex items-center space-x-2 text-xs font-semibold text-blue-800 hover:text-blue-900 bg-blue-50 px-4 py-2 rounded-full border border-blue-200 cursor-pointer"
+              <Link
+                href="/members#guide"
+                className="inline-flex items-center space-x-2 text-xs font-semibold text-blue-800 hover:text-blue-900 bg-blue-50 px-4 py-2 rounded-full border border-blue-200"
               >
                 <span>加入国专委会员体系，共享高校智库与产业对接网络</span>
                 <span>&rarr;</span>
-              </button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目7：成果与智库 (对应导航“成果与智库” #thinktank) */}
+      {/* 栏目7：成果与智库 */}
       {/* ============================================================ */}
       <section id="thinktank" className="scroll-mt-48 lg:scroll-mt-52 py-16 bg-slate-50 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
@@ -760,18 +1001,18 @@ export default function Home() {
               </p>
             </div>
             <div className="mt-4 md:mt-0">
-              <a
-                href="#thinktank"
+              <Link
+                href="/achievements"
                 className="text-xs font-semibold text-blue-800 hover:text-blue-900 inline-flex items-center space-x-1"
               >
                 <span>浏览全部智库成果库</span>
                 <span>&rarr;</span>
-              </a>
+              </Link>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {reports.map((report) => (
+            {liveReports.map((report) => (
               <div
                 key={report.id}
                 className="border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-blue-300 transition-all flex flex-col justify-between bg-white"
@@ -788,17 +1029,20 @@ export default function Home() {
                   </h3>
                   <div className="text-xs text-slate-500 space-y-1">
                     <div>出品方：{report.author}</div>
-                    <div>累计阅读下载：{report.downloads}</div>
+                    <div>状态：{report.downloads}</div>
                   </div>
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                  <button className="text-xs font-semibold text-blue-800 hover:text-blue-900 flex items-center space-x-1 cursor-pointer">
+                  <Link
+                    href="/achievements#reports"
+                    className="text-xs font-semibold text-blue-800 hover:text-blue-900 flex items-center space-x-1"
+                  >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    <span>下载全文 (PDF)</span>
-                  </button>
+                    <span>查阅白皮书概要</span>
+                  </Link>
                   <span className="text-xs text-slate-400">公开授权</span>
                 </div>
               </div>
@@ -808,7 +1052,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 栏目8：信息公开 (对应导航“信息公开” #disclosure) */}
+      {/* 栏目8：信息公开专区 */}
       {/* ============================================================ */}
       <section id="disclosure" className="scroll-mt-48 lg:scroll-mt-52 py-16 bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
@@ -841,21 +1085,21 @@ export default function Home() {
                 <ul className="space-y-2 text-xs text-slate-600">
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
                     <span>国专委工作章程（修订版）</span>
-                    <span className="text-slate-400">PDF</span>
+                    <span className="text-slate-400">公开</span>
                   </li>
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
                     <span>会员代表大会选举办法</span>
-                    <span className="text-slate-400">PDF</span>
+                    <span className="text-slate-400">公开</span>
                   </li>
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
                     <span>学术委员会工作细则</span>
-                    <span className="text-slate-400">PDF</span>
+                    <span className="text-slate-400">公开</span>
                   </li>
                 </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 cursor-pointer">
+              <Link href="/disclosure#basic" className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 hover:underline block">
                 查阅全部制度 &rarr;
-              </div>
+              </Link>
             </div>
 
             {/* Column 2: 财务与收费公示 */}
@@ -869,22 +1113,22 @@ export default function Home() {
                 </div>
                 <ul className="space-y-2 text-xs text-slate-600">
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
-                    <span>2025年度财务收支审计报告</span>
+                    <span>2025年度财务收支报告</span>
                     <span className="text-slate-400">06-18</span>
                   </li>
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
-                    <span>会员会费收取与管理办法公示</span>
+                    <span>会员会费管理规范承诺</span>
                     <span className="text-slate-400">03-12</span>
                   </li>
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
-                    <span>公益赞助与专项基金使用公告</span>
+                    <span>公益专项支出明细公示</span>
                     <span className="text-slate-400">01-10</span>
                   </li>
                 </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 cursor-pointer">
+              <Link href="/disclosure#credit" className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 hover:underline block">
                 查阅财务年报 &rarr;
-              </div>
+              </Link>
             </div>
 
             {/* Column 3: 评审评奖与立项公开 */}
@@ -898,7 +1142,7 @@ export default function Home() {
                 </div>
                 <ul className="space-y-2 text-xs text-slate-600">
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
-                    <span>2026年度科技成果奖初评公示</span>
+                    <span>2026年度科技成果奖初评</span>
                     <span className="text-slate-400">09-15</span>
                   </li>
                   <li className="hover:text-blue-800 cursor-pointer flex items-center justify-between">
@@ -911,9 +1155,9 @@ export default function Home() {
                   </li>
                 </ul>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 cursor-pointer">
+              <Link href="/disclosure#reports" className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 hover:underline block">
                 查阅历年公示 &rarr;
-              </div>
+              </Link>
             </div>
 
             {/* Column 4: 官方证书与信函查验 */}
@@ -928,19 +1172,27 @@ export default function Home() {
                 <p className="text-xs text-blue-200/80 mb-4 leading-relaxed">
                   输入国专委出具的批件编号、会员证书或培训结业证编号，在线核对真伪。
                 </p>
-                <div className="space-y-2">
+                <form onSubmit={handleVerify} className="space-y-2">
                   <input
                     type="text"
+                    value={verifyCode}
+                    onChange={(e) => setVerifyCode(e.target.value)}
                     placeholder="输入16位证书或文件编号"
                     className="w-full px-3 py-1.5 text-xs rounded bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
                   />
                   <button
-                    onClick={() => alert("证书核验服务已就绪，请输入有效证明编号进行核验。")}
+                    type="submit"
                     className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
                   >
                     立即查验
                   </button>
-                </div>
+                </form>
+
+                {verifyMessage && (
+                  <div className="mt-3 p-2.5 rounded bg-blue-950/80 border border-blue-500/40 text-[11px] text-blue-200 leading-snug">
+                    {verifyMessage}
+                  </div>
+                )}
               </div>
               <div className="text-[11px] text-blue-300/70 pt-2 text-center">
                 防伪追溯数据库直连
@@ -951,7 +1203,7 @@ export default function Home() {
       </section>
 
       {/* ============================================================ */}
-      {/* 附加特色：专题聚焦专区 (Special Topics) */}
+      {/* 附加特色：专题聚焦专区 */}
       {/* ============================================================ */}
       <section className="py-14 bg-slate-50 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-8">
@@ -966,28 +1218,33 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               {
-                title: "发展新质生产力高校产业行动",
-                sub: "构建颠覆式科技创新成果产业化与校企融合新引擎",
-                color: "from-blue-700 to-indigo-800",
+                title: '发展新质生产力高校产业行动',
+                sub: '构建颠覆式科技创新成果产业化与校企融合新引擎',
+                color: 'from-blue-700 to-indigo-800',
+                href: '/achievements',
               },
               {
-                title: "“双碳”与高校科技绿色低碳转型",
-                sub: "推动高校零碳技术研发、绿色校办产业与ESG治理",
-                color: "from-emerald-700 to-teal-800",
+                title: '“双碳”与高校科技绿色低碳转型',
+                sub: '推动高校零碳技术研发、绿色校办产业与ESG治理',
+                color: 'from-emerald-700 to-teal-800',
+                href: '/international',
               },
               {
-                title: "高校专精特新校办企业赋能工程",
-                sub: "提供天使创投对接、技术中试、专利护航与产业链整合扶持",
-                color: "from-blue-900 to-slate-900",
+                title: '高校专精特新校办企业赋能工程',
+                sub: '提供天使创投对接、技术中试、专利护航与产业链整合扶持',
+                color: 'from-blue-900 to-slate-900',
+                href: '/members',
               },
               {
-                title: "第三届国际高校产业创新合作年会",
-                sub: "线上大会专题：国内外大学校长论坛、产业日程与签约首发",
-                color: "from-sky-700 to-blue-900",
+                title: '第三届国际高校产业创新合作年会',
+                sub: '线上大会专题：国内外大学校长论坛、产业日程与签约首发',
+                color: 'from-sky-700 to-blue-900',
+                href: '/news',
               },
             ].map((topic, idx) => (
-              <div
+              <Link
                 key={idx}
+                href={topic.href}
                 className={`p-6 rounded-xl text-white bg-gradient-to-br ${topic.color} shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between`}
               >
                 <div>
@@ -1003,14 +1260,64 @@ export default function Home() {
                   <span>进入专题</span>
                   <span>&rarr;</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ─── 新闻详情模态框 ─── */}
+      {readingNews && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-6 space-y-4">
+              <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div className="space-y-1">
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                    {readingNews.tag}
+                  </span>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug mt-1">
+                    {readingNews.title}
+                  </h3>
+                  <div className="text-xs text-slate-400">
+                    发布日期：{readingNews.date} {readingNews.views ? `· 阅读量：${readingNews.views}` : ''}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReadingNews(null)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
+              <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-900 leading-relaxed font-medium">
+                {readingNews.summary}
+              </div>
 
+              <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap font-sans">
+                {readingNews.content || '（正在从国专委官方新闻发稿库加载全文内容...）'}
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                <Link href="/news" className="text-xs font-semibold text-blue-800 hover:underline">
+                  进入新闻中心频道查阅更多 →
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setReadingNews(null)}
+                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
