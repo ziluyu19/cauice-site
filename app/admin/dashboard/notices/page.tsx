@@ -64,11 +64,17 @@ export default function AdminNoticesPage() {
   useEffect(() => {
     let unsubscribe: () => void = () => {};
 
+    // 4秒安全熔断，防止网络波动导致长时间处于加载状态
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 4000);
+
     try {
       const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
+          clearTimeout(timer);
           const list: NoticeItem[] = snapshot.docs.map((docSnap) => ({
             id: docSnap.id,
             ...(docSnap.data() as Omit<NoticeItem, 'id'>),
@@ -78,22 +84,35 @@ export default function AdminNoticesPage() {
         },
         (err) => {
           console.warn('Notices ordered query fallback to basic snapshot:', err);
-          unsubscribe = onSnapshot(collection(db, 'notices'), (snapshot) => {
-            const list: NoticeItem[] = snapshot.docs.map((docSnap) => ({
-              id: docSnap.id,
-              ...(docSnap.data() as Omit<NoticeItem, 'id'>),
-            }));
-            setNoticesList(list);
-            setLoading(false);
-          });
+          unsubscribe = onSnapshot(
+            collection(db, 'notices'),
+            (snapshot) => {
+              clearTimeout(timer);
+              const list: NoticeItem[] = snapshot.docs.map((docSnap) => ({
+                id: docSnap.id,
+                ...(docSnap.data() as Omit<NoticeItem, 'id'>),
+              }));
+              setNoticesList(list);
+              setLoading(false);
+            },
+            (fallbackErr) => {
+              console.warn('Notices fallback error:', fallbackErr);
+              clearTimeout(timer);
+              setLoading(false);
+            }
+          );
         }
       );
     } catch (e) {
       console.error('Failed to setup notices listener:', e);
+      clearTimeout(timer);
       setLoading(false);
     }
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   // 打开创建模态框
@@ -269,71 +288,131 @@ export default function AdminNoticesPage() {
             <p className="text-[11px] text-slate-400">请点击右上角“+ 发布新通知公告”开始录入。</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="bg-slate-900 text-white">
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">类别</th>
-                  <th className="px-4 py-3 font-semibold min-w-[260px]">通知标题</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">发文部门</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">发布日期</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap">当前状态</th>
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">管理操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {noticesList.map((item, idx) => (
-                  <tr
-                    key={item.id}
-                    className={`align-top hover:bg-blue-50/40 transition-colors ${
-                      idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                    }`}
-                  >
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className="px-2.5 py-0.5 rounded font-semibold text-[11px] bg-blue-100 text-blue-900 border border-blue-200">
-                        {item.category || '对外发文'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="font-bold text-slate-900 leading-snug">{item.title}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {item.id}</div>
-                    </td>
-                    <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{item.issuer}</td>
-                    <td className="px-4 py-3.5 text-slate-500 font-mono whitespace-nowrap">{item.date}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          item.status === '进行中'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : item.status === '公示中'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap space-x-2">
+          <>
+            {/* 移动端响应式卡片流 (md:hidden) */}
+            <div className="md:hidden space-y-3">
+              {noticesList.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5 text-xs shadow-2xs"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-2.5 py-0.5 rounded font-semibold text-[11px] bg-blue-100 text-blue-900 border border-blue-200">
+                      {item.category || '对外发文'}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        item.status === '进行中'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : item.status === '公示中'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="font-bold text-slate-900 leading-snug text-sm">{item.title}</h4>
+                    <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>发文：{item.issuer}</span>
+                      <span className="font-mono text-slate-400">日期：{item.date}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-[120px]">
+                      ID: {item.id}
+                    </span>
+                    <div className="flex items-center space-x-2 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleOpenEdit(item)}
-                        className="px-2.5 py-1 rounded bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 text-xs font-semibold cursor-pointer"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
                         onClick={() => setDeleteTarget(item)}
-                        className="px-2.5 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs font-semibold transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs font-semibold cursor-pointer"
                       >
                         删除
                       </button>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 桌面端/平板表格视图 (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-xs text-left min-w-[700px]">
+                <thead>
+                  <tr className="bg-slate-900 text-white">
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">类别</th>
+                    <th className="px-4 py-3 font-semibold min-w-[260px]">通知标题</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">发文部门</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">发布日期</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">当前状态</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">管理操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {noticesList.map((item, idx) => (
+                    <tr
+                      key={item.id}
+                      className={`align-top hover:bg-blue-50/40 transition-colors ${
+                        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                      }`}
+                    >
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="px-2.5 py-0.5 rounded font-semibold text-[11px] bg-blue-100 text-blue-900 border border-blue-200">
+                          {item.category || '对外发文'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-slate-900 leading-snug">{item.title}</div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {item.id}</div>
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{item.issuer}</td>
+                      <td className="px-4 py-3.5 text-slate-500 font-mono whitespace-nowrap">{item.date}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            item.status === '进行中'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : item.status === '公示中'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEdit(item)}
+                          className="px-2.5 py-1 rounded bg-blue-50 text-blue-800 hover:bg-blue-100 border border-blue-200 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          编辑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(item)}
+                          className="px-2.5 py-1 rounded bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          删除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

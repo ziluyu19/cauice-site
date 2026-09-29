@@ -19,16 +19,32 @@ export default function AdminDashboardLayout({
 
   // 认证状态监听与未登录安全拦截
   useEffect(() => {
+    // 3秒安全熔断，防止由于网络原因导致一直停留在“正在校验管理员权限...”
+    const timer = setTimeout(() => {
+      if (auth.currentUser) {
+        setCurrentUser(auth.currentUser);
+        setLoading(false);
+      } else {
+        setLoading(false);
+        router.replace('/admin/login');
+      }
+    }, 3000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      clearTimeout(timer);
       if (user) {
         setCurrentUser(user);
         setLoading(false);
       } else {
+        setLoading(false);
         router.replace('/admin/login');
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, [router]);
 
   // 退出登录处理
@@ -54,6 +70,16 @@ export default function AdminDashboardLayout({
       ),
     },
     {
+      href: '/admin/dashboard/profile',
+      label: '国专委概况管理',
+      exact: false,
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+    },
+    {
       href: '/admin/dashboard/news',
       label: '新闻管理',
       exact: false,
@@ -75,7 +101,7 @@ export default function AdminDashboardLayout({
     },
     {
       href: '/admin/dashboard/projects',
-      label: '国际合作项目',
+      label: '国际合作管理',
       exact: false,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -85,7 +111,7 @@ export default function AdminDashboardLayout({
     },
     {
       href: '/admin/dashboard/members',
-      label: '会员单位管理',
+      label: '会员单位与服务',
       exact: false,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,7 +129,37 @@ export default function AdminDashboardLayout({
         </svg>
       ),
     },
+    {
+      href: '/admin/dashboard/disclosure',
+      label: '信息公开管理',
+      exact: false,
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    },
   ];
+
+  // 计算当前页面标题
+  const currentNav = navMenuItems.find((item) =>
+    item.exact ? pathname === item.href : pathname.startsWith(item.href)
+  );
+
+  // 动态同步后台管理系统标头与协会 Logo Favicon（遵守 Hooks 规则，在任何条件返回之前调用）
+  useEffect(() => {
+    const pageTitle = currentNav ? `${currentNav.label} - 国专委管理后台` : '国专委管理后台';
+    document.title = `${pageTitle} · 中国高校校办产业协会`;
+
+    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'shortcut icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/png';
+    link.href = '/logo.png?v=2';
+  }, [currentNav]);
 
   // 校验中状态展示
   if (loading) {
@@ -115,11 +171,6 @@ export default function AdminDashboardLayout({
     );
   }
 
-  // 计算当前页面标题
-  const currentNav = navMenuItems.find((item) =>
-    item.exact ? pathname === item.href : pathname.startsWith(item.href)
-  );
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col lg:flex-row text-slate-800 font-sans">
       {/* ─── 侧边栏 (Sidebar) ─── */}
@@ -130,20 +181,32 @@ export default function AdminDashboardLayout({
       >
         <div>
           {/* 系统头部 Logo 与名称 */}
-          <div className="h-16 flex items-center px-5 bg-slate-950 border-b border-slate-800 space-x-3">
-            <img
-              src="/logo.png"
-              alt="Logo"
-              className="w-8 h-8 rounded-full object-contain bg-white shadow-xs"
-            />
-            <div className="overflow-hidden">
-              <h1 className="text-sm font-bold text-white tracking-wide truncate">
-                国专委管理后台
-              </h1>
-              <p className="text-[10px] text-blue-300/80 font-mono tracking-wider">
-                CAUI-ICEC CMS v1.0
-              </p>
+          <div className="h-16 flex items-center justify-between px-5 bg-slate-950 border-b border-slate-800">
+            <div className="flex items-center space-x-3 overflow-hidden">
+              <img
+                src="/logo.png"
+                alt="Logo"
+                className="w-8 h-8 rounded-full object-contain bg-white shadow-xs shrink-0"
+              />
+              <div className="overflow-hidden">
+                <h1 className="text-sm font-bold text-white tracking-wide truncate">
+                  国专委管理后台
+                </h1>
+                <p className="text-[10px] text-blue-300/80 font-mono tracking-wider">
+                  CAUI-ICEC CMS v1.0
+                </p>
+              </div>
             </div>
+            {/* 移动端关闭按钮 */}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           {/* 导航菜单列表 */}
@@ -237,11 +300,11 @@ export default function AdminDashboardLayout({
           </div>
 
           {/* 右侧管理员身份信息 */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-slate-500 hidden sm:inline">管理员：</span>
-              <span className="font-semibold text-slate-800 font-mono">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs max-w-[150px] sm:max-w-none">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span className="text-slate-500 hidden sm:inline shrink-0">管理员：</span>
+              <span className="font-semibold text-slate-800 font-mono truncate">
                 {currentUser?.email || '已认证管理员'}
               </span>
             </div>
@@ -249,10 +312,13 @@ export default function AdminDashboardLayout({
             <button
               type="button"
               onClick={handleLogout}
-              className="p-1.5 text-xs text-slate-500 hover:text-red-700 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden sm:flex items-center space-x-1"
+              className="p-1.5 text-xs text-slate-500 hover:text-red-700 rounded hover:bg-slate-100 transition-colors cursor-pointer flex items-center space-x-1 shrink-0"
               title="安全退出"
             >
-              <span>退出</span>
+              <svg className="w-4 h-4 text-red-500 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              <span className="hidden sm:inline">退出</span>
             </button>
           </div>
         </header>

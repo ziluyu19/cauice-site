@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedMobileItem, setExpandedMobileItem] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginTab, setLoginTab] = useState<"account" | "sms">("account");
   const [searchQuery, setSearchQuery] = useState("");
@@ -16,38 +17,131 @@ export default function Navbar() {
     return null;
   }
 
-  // Navigation Links (根据要求，“国专委概况”指向独立页面 /guozhuanwei-gaikuang)
-  const navItems = [
-    { name: "首页", href: "/" },
-    { name: "国专委概况", href: "/guozhuanwei-gaikuang" },
-    { name: '新闻中心', href: '/news' },
-    { name: "通知公告", href: "/notice" },
-    { name: "国际合作", href: "/international" },
-    { name: "会员单位与服务", href: "/members" },
-    { name: "成果与智库", href: "/achievements" },
-    { name: '信息公开', href: '/disclosure' },
+  // Navigation Links 与各频道对应的二级栏目
+  interface NavSubItem {
+    name: string;
+    href: string;
+  }
+
+  interface NavItem {
+    name: string;
+    href: string;
+    children: NavSubItem[];
+  }
+
+  const navItems: NavItem[] = [
+    {
+      name: "首页",
+      href: "/",
+      children: [
+        { name: "概况与使命", href: "/#about" },
+        { name: "要闻速览", href: "/#news" },
+        { name: "通知公告", href: "/#notices" },
+        { name: "国际协同", href: "/#global" },
+        { name: "办事大厅", href: "/#services" },
+        { name: "会员名录", href: "/#members" },
+        { name: "成果与智库", href: "/#thinktank" },
+        { name: "信息公开", href: "/#disclosure" },
+      ],
+    },
+    {
+      name: "国专委概况",
+      href: "/guozhuanwei-gaikuang",
+      children: [
+        { name: "国专委简介", href: "/guozhuanwei-gaikuang#intro" },
+        { name: "成立批复与工作规则", href: "/guozhuanwei-gaikuang#rules" },
+        { name: "组织架构与会员名录", href: "/guozhuanwei-gaikuang#organization" },
+        { name: "秘书处与办事机构", href: "/guozhuanwei-gaikuang#secretariat" },
+        { name: "大事记", href: "/guozhuanwei-gaikuang#history" },
+        { name: "联系方式", href: "/guozhuanwei-gaikuang#contact" },
+      ],
+    },
+    {
+      name: "新闻中心",
+      href: "/news",
+      children: [
+        { name: "国专委要闻", href: "/news#committee-news" },
+        { name: "会员单位动态", href: "/news#member-news" },
+        { name: "媒体关注与报道", href: "/news#media-focus" },
+      ],
+    },
+    {
+      name: "通知公告",
+      href: "/notice",
+      children: [
+        { name: "最新通知公告", href: "/notice#latest" },
+        { name: "对外发文", href: "/notice#dispatch" },
+        { name: "项目申报", href: "/notice#projects" },
+        { name: "活动报名", href: "/notice#activities" },
+        { name: "政策法规", href: "/notice#policies" },
+        { name: "办理须知", href: "/notice#guide" },
+      ],
+    },
+    {
+      name: "国际合作",
+      href: "/international",
+      children: [
+        { name: "合作项目库", href: "/international#projects" },
+        { name: "国别与区域", href: "/international#regions" },
+        { name: "一带一路", href: "/international#bri" },
+        { name: "涉外交流活动", href: "/international#activities" },
+        { name: "合作需求", href: "/international#matchmaking" },
+        { name: "国际组织", href: "/international#organizations" },
+      ],
+    },
+    {
+      name: "会员单位与服务",
+      href: "/members",
+      children: [
+        { name: "会员单位名录", href: "/members#directory" },
+        { name: "会员单位风采", href: "/members#stories" },
+        { name: "入会指引", href: "/members#guide" },
+        { name: "服务事项与办事指南", href: "/members#services" },
+      ],
+    },
+    {
+      name: "成果与智库",
+      href: "/achievements",
+      children: [
+        { name: "科技成果与技术需求", href: "/achievements#tech-results" },
+        { name: "团体标准 T/CAUI", href: "/achievements#standards" },
+        { name: "研究报告", href: "/achievements#reports" },
+        { name: "典型案例", href: "/achievements#cases" },
+        { name: "专家库", href: "/achievements#experts" },
+        { name: "培训与人才", href: "/achievements#training" },
+      ],
+    },
+    {
+      name: "信息公开",
+      href: "/disclosure",
+      children: [
+        { name: "基本信息", href: "/disclosure#basic" },
+        { name: "负责人与机构信息", href: "/disclosure#leaders" },
+        { name: "组织机构", href: "/disclosure#org" },
+        { name: "年度工作报告", href: "/disclosure#reports" },
+        { name: "信用承诺", href: "/disclosure#credit" },
+        { name: "活动与项目情况", href: "/disclosure#activities" },
+        { name: "互动交流", href: "/disclosure#interaction" },
+      ],
+    },
   ];
 
   // 页面内或跨页面的平滑滚动跳转
   const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-    if (href.startsWith("/#")) {
-      const targetId = href.replace("/#", "");
-      if (pathname === "/") {
-        e.preventDefault();
-        if (!targetId || targetId === "top") {
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        } else {
-          const el = document.getElementById(targetId);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth" });
-          }
-        }
-      }
-    } else if (href === "/") {
-      if (pathname === "/") {
-        e.preventDefault();
+    const [path, hash] = href.split("#");
+    const targetPath = path === "" ? "/" : path;
+
+    if (hash && (pathname === targetPath || (targetPath === "/" && pathname === "/"))) {
+      e.preventDefault();
+      const el = document.getElementById(hash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      } else if (hash === "top") {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+    } else if (href === pathname || (href === "/" && pathname === "/")) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -118,24 +212,24 @@ export default function Navbar() {
         </div>
 
         {/* 机构标识与搜索大厅 (Branding Area) */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-3.5 group">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-2.5 sm:py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center space-x-2.5 sm:space-x-3.5 group min-w-0 flex-1 mr-2">
             {/* Logo Badge */}
             <img
               src="/logo.png"
               alt="中国高校校办产业协会 Logo"
-              className="w-12 h-12 rounded-full object-contain shrink-0 shadow-xs ring-1 ring-slate-200 group-hover:scale-105 transition-transform"
+              className="w-9 h-9 sm:w-12 sm:h-12 rounded-full object-contain shrink-0 shadow-xs ring-1 ring-slate-200 group-hover:scale-105 transition-transform"
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center space-x-2">
-                <span className="text-base sm:text-xl lg:text-2xl font-bold tracking-tight text-blue-950 font-serif truncate">
+                <span className="text-sm sm:text-xl lg:text-2xl font-bold tracking-tight text-blue-950 font-serif truncate block">
                   中国高校校办产业协会国际合作与交流专业委员会
                 </span>
                 <span className="hidden lg:inline-block px-2 py-0.5 text-xs font-semibold rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
                   官方门户
                 </span>
               </div>
-              <p className="text-xs text-slate-500 tracking-wider font-medium truncate">
+              <p className="text-[10px] sm:text-xs text-slate-500 tracking-wider font-medium truncate hidden sm:block">
                 International Cooperation and Exchange Committee of the Chinese Association of University-run Industries
               </p>
             </div>
@@ -198,7 +292,7 @@ export default function Navbar() {
         <nav className="bg-blue-900 text-white shadow-inner">
           <div className="max-w-7xl mx-auto px-4 sm:px-8">
             <div className="hidden lg:flex items-center justify-between">
-              <ul className="flex space-x-1">
+              <ul className="flex space-x-0.5 xl:space-x-1">
                 {navItems.map((item, idx) => {
                   const isActive =
                     item.href === "/"
@@ -220,18 +314,62 @@ export default function Navbar() {
                       : false;
 
                   return (
-                    <li key={idx}>
+                    <li key={idx} className="relative group">
                       <Link
                         href={item.href}
                         onClick={(e) => handleNavClick(e, item.href)}
-                        className={`inline-block px-4 py-3.5 text-sm font-medium tracking-wide transition-all border-b-2 hover:bg-blue-800 hover:text-white border-transparent select-none cursor-pointer ${
+                        className={`inline-flex items-center space-x-1 px-2.5 xl:px-3.5 py-3.5 text-xs xl:text-sm font-medium tracking-wide transition-all border-b-2 group-hover:bg-blue-800 group-hover:text-white border-transparent select-none cursor-pointer ${
                           isActive
                             ? "bg-blue-950 text-white border-white shadow-xs font-semibold"
-                            : "text-blue-100"
+                            : "text-blue-100 hover:bg-blue-800 hover:text-white"
                         }`}
                       >
-                        {item.name}
+                        <span>{item.name}</span>
+                        <svg
+                          className="w-3 h-3 text-blue-300/80 group-hover:rotate-180 group-hover:text-white transition-transform duration-200 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </Link>
+
+                      {/* 鼠标悬停展开的二级栏目浮窗 (Dropdown Menu) */}
+                      {item.children && item.children.length > 0 && (
+                        <div
+                          className={`absolute top-full pt-1.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto ${
+                            idx >= 5 ? "right-0" : "left-0"
+                          }`}
+                        >
+                          <div className="bg-blue-900 rounded-xl shadow-2xl border border-blue-700/80 py-1.5 min-w-[195px] text-white ring-1 ring-white/10 backdrop-blur-md">
+                            {/* 二级栏目列表 */}
+                            <div className="py-0.5 space-y-0.5 px-1">
+                              {item.children.map((child, cIdx) => (
+                                <Link
+                                  key={cIdx}
+                                  href={child.href}
+                                  onClick={(e) => handleNavClick(e, child.href)}
+                                  className="group/item flex items-center justify-between px-3 py-2 text-xs text-blue-100 hover:text-white hover:bg-blue-800 rounded-lg transition-colors font-medium select-none"
+                                >
+                                  <span className="flex items-center space-x-2.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-300/50 group-hover/item:bg-sky-300 group-hover/item:scale-125 transition-all"></span>
+                                    <span>{child.name}</span>
+                                  </span>
+                                  <svg
+                                    className="w-3 h-3 text-blue-300/50 group-hover/item:text-sky-300 group-hover/item:translate-x-0.5 transition-all"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -242,10 +380,11 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* 移动端下拉菜单 */}
+            {/* 移动端下拉菜单与二级栏目折叠 */}
             {mobileMenuOpen && (
-              <div className="lg:hidden py-3 border-t border-blue-800 space-y-1">
+              <div className="lg:hidden py-3 border-t border-blue-800 space-y-1 max-h-[calc(100vh-130px)] overflow-y-auto">
                 {navItems.map((item, idx) => {
+                  const isExpanded = expandedMobileItem === item.name;
                   const isActive =
                     item.href === "/"
                       ? pathname === "/"
@@ -266,28 +405,78 @@ export default function Navbar() {
                       : false;
 
                   return (
-                    <Link
-                      key={idx}
-                      href={item.href}
-                      onClick={(e) => {
-                        setMobileMenuOpen(false);
-                        handleNavClick(e, item.href);
-                      }}
-                      className={`block px-3 py-2 text-sm rounded select-none cursor-pointer ${
-                        isActive
-                          ? "bg-blue-950 text-white font-semibold"
-                          : "text-blue-100 hover:bg-blue-800 hover:text-white"
-                      }`}
-                    >
-                      {item.name}
-                    </Link>
+                    <div key={idx} className="border-b border-blue-800/40 last:border-b-0">
+                      <div className="flex items-center justify-between">
+                        <Link
+                          href={item.href}
+                          onClick={(e) => {
+                            setMobileMenuOpen(false);
+                            handleNavClick(e, item.href);
+                          }}
+                          className={`flex-1 px-3 py-2.5 text-sm rounded-lg select-none cursor-pointer transition-colors ${
+                            isActive
+                              ? "bg-blue-950 text-white font-semibold"
+                              : "text-blue-100 hover:bg-blue-800/70 hover:text-white"
+                          }`}
+                        >
+                          {item.name}
+                        </Link>
+                        {item.children && item.children.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedMobileItem(isExpanded ? null : item.name)}
+                            className="p-2 text-blue-300 hover:text-white transition-colors"
+                            aria-label={`展开${item.name}二级栏目`}
+                          >
+                            <svg
+                              className={`w-4 h-4 transition-transform duration-200 ${
+                                isExpanded ? "rotate-180 text-white" : ""
+                              }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 展开的二级栏目列表 */}
+                      {isExpanded && item.children && item.children.length > 0 && (
+                        <div className="pl-4 pr-2 py-1 mb-1.5 space-y-1 bg-blue-950/40 rounded-lg">
+                          {item.children.map((child, cIdx) => (
+                            <Link
+                              key={cIdx}
+                              href={child.href}
+                              onClick={(e) => {
+                                setMobileMenuOpen(false);
+                                handleNavClick(e, child.href);
+                              }}
+                              className="px-3 py-2 text-xs text-blue-200 hover:text-white hover:bg-blue-800/50 rounded transition-colors flex items-center justify-between"
+                            >
+                              <span className="flex items-center space-x-2">
+                                <span className="w-1 h-1 rounded-full bg-blue-400"></span>
+                                <span>{child.name}</span>
+                              </span>
+                              <svg className="w-3 h-3 text-blue-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 <div className="pt-2 border-t border-blue-800">
                   <Link
                     href="/#contact"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block px-3 py-2 text-sm text-blue-200 hover:bg-blue-800"
+                    onClick={(e) => {
+                      setMobileMenuOpen(false);
+                      handleNavClick(e, "/#contact");
+                    }}
+                    className="block px-3 py-2 text-sm text-blue-200 hover:bg-blue-800 rounded"
                   >
                     在线咨询与办事入口
                   </Link>

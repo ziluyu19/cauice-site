@@ -266,10 +266,6 @@ export default function Home() {
   // 模态阅读弹窗状态
   const [readingNews, setReadingNews] = useState<NewsItem | null>(null);
 
-  // 防伪查验状态
-  const [verifyCode, setVerifyCode] = useState('');
-  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
-
   // 实时订阅 Firestore 数据
   useEffect(() => {
     // 1. 订阅 News
@@ -289,7 +285,13 @@ export default function Home() {
                 summary: d.summary || '',
                 date: d.date || '',
                 views: d.views || 100,
-                type: (d.category === '国专委动态' || d.category === '专委会动态') ? 'committee' : d.category === '行业热点' ? 'industry' : 'all',
+                type: (d.category === '国专委要闻' || d.category === '国专委动态' || d.category === '专委会动态')
+                  ? 'committee'
+                  : (d.category === '会员单位动态' || d.category === '行业热点' || d.category === '成果转化')
+                  ? 'industry'
+                  : d.category === '会议纪要'
+                  ? 'meeting'
+                  : 'all',
                 content: d.content || '',
               };
             });
@@ -434,15 +436,6 @@ export default function Home() {
     if (noticeTab === 'all') return true;
     return item.type === noticeTab;
   });
-
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!verifyCode.trim()) {
-      setVerifyMessage('请输入需要核验的16位公文、证书或证明编号');
-      return;
-    }
-    setVerifyMessage(`编号【${verifyCode.trim()}】已接入防伪追溯数据库，经系统查验为真实合规在册证书。`);
-  };
 
   return (
     <div id="top" className="min-h-screen bg-white text-slate-800 flex flex-col font-sans">
@@ -1072,7 +1065,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Column 1: 机构规章与章程 */}
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
               <div>
@@ -1158,45 +1151,6 @@ export default function Home() {
               <Link href="/disclosure#reports" className="mt-4 pt-3 border-t border-slate-200 text-xs font-semibold text-blue-800 hover:underline block">
                 查阅历年公示 &rarr;
               </Link>
-            </div>
-
-            {/* Column 4: 官方证书与信函查验 */}
-            <div className="bg-gradient-to-br from-blue-900 to-slate-900 text-white p-6 rounded-xl shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="text-sm font-bold text-white mb-2 flex items-center space-x-2">
-                  <svg className="w-4 h-4 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  <span>公文证书真伪核验</span>
-                </div>
-                <p className="text-xs text-blue-200/80 mb-4 leading-relaxed">
-                  输入国专委出具的批件编号、会员证书或培训结业证编号，在线核对真伪。
-                </p>
-                <form onSubmit={handleVerify} className="space-y-2">
-                  <input
-                    type="text"
-                    value={verifyCode}
-                    onChange={(e) => setVerifyCode(e.target.value)}
-                    placeholder="输入16位证书或文件编号"
-                    className="w-full px-3 py-1.5 text-xs rounded bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  />
-                  <button
-                    type="submit"
-                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    立即查验
-                  </button>
-                </form>
-
-                {verifyMessage && (
-                  <div className="mt-3 p-2.5 rounded bg-blue-950/80 border border-blue-500/40 text-[11px] text-blue-200 leading-snug">
-                    {verifyMessage}
-                  </div>
-                )}
-              </div>
-              <div className="text-[11px] text-blue-300/70 pt-2 text-center">
-                防伪追溯数据库直连
-              </div>
             </div>
           </div>
         </div>

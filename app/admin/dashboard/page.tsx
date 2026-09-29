@@ -38,6 +38,11 @@ export default function AdminDashboardOverviewPage() {
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
 
   useEffect(() => {
+    // 3秒安全熔断，防止网络阻塞导致指标一直处于加载骨架屏
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
@@ -262,6 +267,7 @@ export default function AdminDashboardOverviewPage() {
     }
 
     return () => {
+      clearTimeout(timer);
       unsubAuth();
       unsubNews();
       unsubNotices();
@@ -442,6 +448,17 @@ export default function AdminDashboardOverviewPage() {
 
             <div className="space-y-2.5 text-xs">
               <Link
+                href="/admin/dashboard/profile"
+                className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group block"
+              >
+                <div>
+                  <div className="font-bold text-slate-800 group-hover:text-blue-900">编辑国专委概况</div>
+                  <div className="text-slate-400 text-[11px] mt-0.5">简介、批复规则、架构名录与大事记</div>
+                </div>
+                <span className="text-blue-800 font-bold">&rarr;</span>
+              </Link>
+
+              <Link
                 href="/admin/dashboard/news"
                 className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group block"
               >
@@ -479,8 +496,30 @@ export default function AdminDashboardOverviewPage() {
                 className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group block"
               >
                 <div>
-                  <div className="font-bold text-slate-800 group-hover:text-blue-900">管理会员名录</div>
-                  <div className="text-slate-400 text-[11px] mt-0.5">高校与骨干校办企业会员资质</div>
+                  <div className="font-bold text-slate-800 group-hover:text-blue-900">会员单位与服务</div>
+                  <div className="text-slate-400 text-[11px] mt-0.5">名录、风采案例、入会指引与办事指南</div>
+                </div>
+                <span className="text-blue-800 font-bold">&rarr;</span>
+              </Link>
+
+              <Link
+                href="/admin/dashboard/achievements"
+                className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group block"
+              >
+                <div>
+                  <div className="font-bold text-slate-800 group-hover:text-blue-900">成果与智库管理</div>
+                  <div className="text-slate-400 text-[11px] mt-0.5">成果与需求、团体标准、智库报告、案例、专家库与培训</div>
+                </div>
+                <span className="text-blue-800 font-bold">&rarr;</span>
+              </Link>
+
+              <Link
+                href="/admin/dashboard/disclosure"
+                className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group block"
+              >
+                <div>
+                  <div className="font-bold text-slate-800 group-hover:text-blue-900">信息公开管理</div>
+                  <div className="text-slate-400 text-[11px] mt-0.5">基本信息、负责人、机构架构、年度报告、承诺与活动</div>
                 </div>
                 <span className="text-blue-800 font-bold">&rarr;</span>
               </Link>

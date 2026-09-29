@@ -17,7 +17,13 @@ export default function AdminLoginPage() {
 
   // 若已处于登录状态，自动重定向到后台首页
   useEffect(() => {
+    // 3秒安全熔断，防止由于网络波动导致长时间处于“正在校验系统权限...”
+    const timer = setTimeout(() => {
+      setCheckingAuth(false);
+    }, 3000);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      clearTimeout(timer);
       if (user) {
         router.replace('/admin/dashboard');
       } else {
@@ -25,8 +31,24 @@ export default function AdminLoginPage() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, [router]);
+
+  // 设置登录页标题与协会 Logo Favicon
+  useEffect(() => {
+    document.title = '管理员登录 - 国专委管理后台 · 中国高校校办产业协会';
+    let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'shortcut icon';
+      document.head.appendChild(link);
+    }
+    link.type = 'image/png';
+    link.href = '/logo.png?v=2';
+  }, []);
 
   // 处理管理员登录
   const handleLogin = async (e: React.FormEvent) => {
