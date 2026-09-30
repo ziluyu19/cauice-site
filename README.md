@@ -1,5 +1,5 @@
 # 中国高校校办产业协会国际合作与交流专业委员会
-## 官方数字化综合门户与内容管理系统 (CAUI-ICEC Portal & CMS)
+## 官方数字化综合门户与内容管理系统 (CAUIICE Portal & CMS)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.3.5-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2.8-blue?style=flat-square&logo=react)](https://react.dev/)
@@ -11,7 +11,7 @@
 
 ## 📌 项目简介
 
-本项目为**中国高校校办产业协会国际合作与交流专业委员会**（International Cooperation and Exchange Committee of the Chinese Association of University-run Industries，简称“国专委 / CAUI-ICEC”）的官方数字化综合门户与后台内容管理平台。
+本项目为**中国高校校办产业协会国际合作与交流专业委员会**（International Cooperation and Exchange Committee of the Chinese Association of University-run Industries，简称“国专委 / CAUIICE”）的官方数字化综合门户与后台内容管理平台。
 
 系统定位于服务全国高等院校、校办骨干产业、大学科技园及技术转移机构，全面展示跨国产学研融合发展新范式、科技成果全球转化、涉外合作对接、行业智库标准及规范信息公开。
 
