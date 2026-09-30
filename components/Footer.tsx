@@ -207,14 +207,6 @@ export default function Footer() {
               <a href="/#disclosure" className="hover:text-slate-300 transition-colors">
                 信息公开规定
               </a>
-              <span className="text-slate-700">|</span>
-              <a href="/#about" className="hover:text-slate-300 transition-colors">
-                隐私保护指引
-              </a>
-              <span className="text-slate-700">|</span>
-              <a href="/#top" className="hover:text-slate-300 transition-colors">
-                无障碍浏览适配
-              </a>
             </div>
           </div>
 

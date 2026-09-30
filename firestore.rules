@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. 管理员身份判别函数 (严格绑定唯一管理员 UID)
+    // ─────────────────────────────────────────────────────────────
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.uid == "B6O8cveFwIMWBFylbHWz7LjgARw1";
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. 网站官方公开内容集合：全网公开只读，仅唯一管理员可增删改
+    // ─────────────────────────────────────────────────────────────
+
+    // 新闻中心
+    match /news/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 通知公告
+    match /notices/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 国际合作项目库
+    match /projects/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 会员单位名录
+    match /members/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 成果与智库 (兼容集合)
+    match /achievements/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 站点全局配置 (gaikuang, international, members, achievements, disclosure)
+    match /siteConfig/{configDoc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 3. 前台公众诉求与意向对接留言池 (inquiries)
+    // ─────────────────────────────────────────────────────────────
+    // 业务场景说明：
+    // A. 信息公开公众诉求 (app/disclosure): type, name, contact, content, status, createdAt
+    // B. 国际合作需求对接 (app/international): unit, type, field, contact, desc, source, createdAt, date
+    // C. 国专委概况在线咨询 (app/guozhuanwei-gaikuang): name, unit, contact, message, source, createdAt, date
+    // ─────────────────────────────────────────────────────────────
+    match /inquiries/{inquiryId} {
+      // 查询、官方办理答复、删除仅限唯一管理员
+      allow read, update, delete: if isAdmin();
+
+      // 匿名/前台访客提交：仅允许新增 (create)，严格限制字段白名单与内容长度，禁止伪造管理员字段
+      allow create: if
+        // 必须为合法键名白名单，绝不允许注入 reply, repliedBy, replyDate, isPublic 等管理字段
+        request.resource.data.keys().hasOnly([
+          'contact', 'content', 'desc', 'message',
+          'name', 'unit', 'type', 'field', 'source',
+          'status', 'date', 'createdAt'
+        ]) &&
+
+        // 联系方式必填且受限
+        request.resource.data.contact is string &&
+        request.resource.data.contact.size() > 0 &&
+        request.resource.data.contact.size() <= 120 &&
+
+        // 核心诉求正文：覆盖三类前台表单字段 (content / desc / message)，必有其一且不超过 4000 字符
+        (
+          (request.resource.data.content is string && request.resource.data.content.size() <= 4000) ||
+          (request.resource.data.desc is string && request.resource.data.desc.size() <= 4000) ||
+          (request.resource.data.message is string && request.resource.data.message.size() <= 4000)
+        ) &&
+
+        // 可选字段的严格类型与长度校验 (存在则必须满足约束)
+        (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 100)) &&
+        (!('unit' in request.resource.data) || (request.resource.data.unit is string && request.resource.data.unit.size() <= 200)) &&
+        (!('type' in request.resource.data) || (request.resource.data.type is string && request.resource.data.type.size() <= 100)) &&
+        (!('field' in request.resource.data) || (request.resource.data.field is string && request.resource.data.field.size() <= 100)) &&
+        (!('source' in request.resource.data) || (request.resource.data.source is string && request.resource.data.source.size() <= 100)) &&
+        (!('status' in request.resource.data) || (request.resource.data.status is string && request.resource.data.status.size() <= 50)) &&
+        (!('date' in request.resource.data) || (request.resource.data.date is string && request.resource.data.date.size() <= 30)) &&
+        (!('createdAt' in request.resource.data) || request.resource.data.createdAt is timestamp);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 4. 默认拒绝规则：全库所有未明确匹配路径禁止一切读写
+    // ─────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

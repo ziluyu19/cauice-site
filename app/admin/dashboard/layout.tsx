@@ -58,6 +58,16 @@ export default function AdminDashboardLayout({
         clearTimeout(timeoutTimer);
 
         if (user) {
+          if (user.uid !== 'B6O8cveFwIMWBFylbHWz7LjgARw1') {
+            setErrorMessage('无管理员权限：该账号未被授予系统管理权限');
+            try {
+              sessionStorage.setItem('admin_auth_error', '无管理员权限：该账号未被授予系统管理权限');
+            } catch (e) {}
+            signOut(auth).finally(() => {
+              router.push('/admin/login');
+            });
+            return;
+          }
           setCurrentUser(user);
           setLoading(false);
         } else {
@@ -266,7 +276,7 @@ export default function AdminDashboardLayout({
                   国专委管理后台
                 </h1>
                 <p className="text-[10px] text-blue-300/80 font-mono tracking-wider">
-                  CAUI-ICEC CMS v1.0
+                  CAUIICE CMS v1.0
                 </p>
               </div>
             </div>

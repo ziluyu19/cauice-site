@@ -127,7 +127,7 @@ export default function AdminLoginPage() {
               国专委内容管理系统
             </h2>
             <p className="mt-1 text-xs text-blue-200/80">
-              CAUI-ICEC Content Management System · 管理员登录
+              CAUIICE Content Management System · 管理员登录
             </p>
           </div>
         </div>

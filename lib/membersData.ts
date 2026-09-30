@@ -198,3 +198,6 @@ export const defaultMembersContentData: MembersPageContentData = {
   guide: defaultGuideData,
   services: defaultServicesConfig,
 };
+
+export const defaultMemberServicesConfig = defaultServicesConfig;
+export const defaultMemberGuideData = defaultGuideData;
