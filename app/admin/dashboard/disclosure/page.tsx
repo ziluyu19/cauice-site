@@ -32,7 +32,12 @@ interface UserInquiryItem {
   contact: string;
   content: string;
   status: string;
+  reply?: string;
+  replyDate?: string;
+  repliedBy?: string;
+  isPublic?: boolean;
   createdAt?: any;
+  updatedAt?: any;
 }
 
 export default function AdminDisclosurePage() {
@@ -713,15 +718,51 @@ export default function AdminDisclosurePage() {
     );
   };
 
-  // 真实在线留言订阅（Firestore inquiries 集合）
+  // 真实在线留言订阅（Firestore inquiries 集合）与答复办理状态
   const [userInquiries, setUserInquiries] = useState<UserInquiryItem[]>([]);
   const [loadingInquiries, setLoadingInquiries] = useState(false);
+  const [inquiryStatusFilter, setInquiryStatusFilter] = useState<'all' | 'pending' | 'resolved'>('all');
+
+  // 办理答复弹窗状态
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+  const [replyingInquiry, setReplyingInquiry] = useState<UserInquiryItem | null>(null);
+  const [replyFormData, setReplyFormData] = useState({
+    reply: '',
+    replyDate: new Date().toISOString().slice(0, 10),
+    repliedBy: '国专委秘书处',
+    publishToFrontend: true,
+    status: '已答复办结',
+  });
+
+  // 删除留言弹窗目标
+  const [deleteTargetInquiry, setDeleteTargetInquiry] = useState<UserInquiryItem | null>(null);
+
+  // 格式化时间戳工具函数
+  const formatInquiryTime = (ts: any) => {
+    if (!ts) return '';
+    try {
+      if (typeof ts === 'string') return ts.slice(0, 16).replace('T', ' ');
+      if (ts.toDate && typeof ts.toDate === 'function') {
+        const d = ts.toDate();
+        const pad = (n: number) => (n < 10 ? '0' + n : n);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+      if (ts.seconds) {
+        const d = new Date(ts.seconds * 1000);
+        const pad = (n: number) => (n < 10 ? '0' + n : n);
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      }
+    } catch (e) {
+      return '';
+    }
+    return '';
+  };
 
   useEffect(() => {
     let unsubscribe: () => void = () => {};
     try {
       setLoadingInquiries(true);
-      const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, 'inquiries'));
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
@@ -729,6 +770,12 @@ export default function AdminDisclosurePage() {
             id: docSnap.id,
             ...(docSnap.data() as Omit<UserInquiryItem, 'id'>),
           }));
+          // 内存降序排序：最新提交的排在最前
+          list.sort((a, b) => {
+            const timeA = a.createdAt?.seconds || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt?.seconds || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+          });
           setUserInquiries(list);
           setLoadingInquiries(false);
         },
@@ -747,6 +794,175 @@ export default function AdminDisclosurePage() {
     };
   }, []);
 
+  // 打开答复弹窗
+  const handleOpenReplyModal = (inq: UserInquiryItem) => {
+    setReplyingInquiry(inq);
+    const syncId = 'mi-inq-' + inq.id;
+    const isAlreadyInPublic = contentData.interaction.messageInquiries.some(
+      (m) => m.id === syncId || (m.question === inq.content && m.user === inq.name)
+    );
+    setReplyFormData({
+      reply: inq.reply || '',
+      replyDate: inq.replyDate || new Date().toISOString().slice(0, 10),
+      repliedBy: inq.repliedBy || '国专委秘书处',
+      publishToFrontend: inq.isPublic !== undefined ? inq.isPublic : isAlreadyInPublic || true,
+      status: inq.status === '待审核办理' ? '已答复办结' : (inq.status || '已答复办结'),
+    });
+    setIsReplyModalOpen(true);
+  };
+
+  // 提交并保存官方答复
+  const handleSaveReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyingInquiry) return;
+    if (!replyFormData.reply.trim()) {
+      showToast('请填写官方办理答复内容', 'error');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const syncId = 'mi-inq-' + replyingInquiry.id;
+      const cleanReply = replyFormData.reply.trim();
+      const cleanRepliedBy = replyFormData.repliedBy.trim() || '国专委秘书处';
+      const replyDate = replyFormData.replyDate || new Date().toISOString().slice(0, 10);
+
+      // 1. 更新 Firestore 中的 inquiries 记录
+      const inqRef = doc(db, 'inquiries', replyingInquiry.id);
+      await updateDoc(inqRef, {
+        reply: cleanReply,
+        replyDate: replyDate,
+        repliedBy: cleanRepliedBy,
+        status: replyFormData.status,
+        isPublic: replyFormData.publishToFrontend,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // 2. 如果勾选了“同步至前台【咨询留言公开选登】”
+      let updatedFaqs = [...contentData.interaction.messageInquiries];
+      const existingIdx = updatedFaqs.findIndex(
+        (m) => m.id === syncId || (m.question === replyingInquiry.content && m.user === replyingInquiry.name)
+      );
+
+      if (replyFormData.publishToFrontend) {
+        const rawDate = formatInquiryTime(replyingInquiry.createdAt);
+        const faqItem: MessageInquiryItem = {
+          id: syncId,
+          user: replyingInquiry.name,
+          date: rawDate ? rawDate.slice(0, 10) : replyDate,
+          question: replyingInquiry.content,
+          reply: cleanReply,
+          replyDate: replyDate,
+        };
+
+        if (existingIdx >= 0) {
+          updatedFaqs[existingIdx] = faqItem;
+        } else {
+          updatedFaqs = [faqItem, ...updatedFaqs];
+        }
+
+        await persistDisclosure(
+          {
+            ...contentData,
+            interaction: {
+              ...contentData.interaction,
+              messageInquiries: updatedFaqs,
+            },
+          },
+          '答复已成功保存，并已同步公开选登至前台互动专栏！'
+        );
+      } else {
+        // 如果未勾选且先前已存在于公开选登，则将其下架移除
+        if (existingIdx >= 0) {
+          updatedFaqs = updatedFaqs.filter((_, idx) => idx !== existingIdx);
+          await persistDisclosure(
+            {
+              ...contentData,
+              interaction: {
+                ...contentData.interaction,
+                messageInquiries: updatedFaqs,
+              },
+            },
+            '答复已成功保存（仅内部记录，未公开）'
+          );
+        } else {
+          showToast('答复已成功保存（仅内部记录）');
+        }
+      }
+
+      setIsReplyModalOpen(false);
+      setReplyingInquiry(null);
+    } catch (err: any) {
+      console.error('Save inquiry reply error:', err);
+      showToast('保存答复失败：' + (err.message || '请稍后重试'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 快捷切换是否在前台公开选登
+  const handleToggleInquiryPublic = async (inq: UserInquiryItem) => {
+    if (!inq.reply) {
+      showToast('请先为该留言录入官方答复后再同步至前台公开选登', 'error');
+      handleOpenReplyModal(inq);
+      return;
+    }
+
+    const syncId = 'mi-inq-' + inq.id;
+    const isCurrentlyPublic = contentData.interaction.messageInquiries.some(
+      (m) => m.id === syncId || (m.question === inq.content && m.user === inq.name)
+    );
+    const willBePublic = !isCurrentlyPublic;
+
+    setSaving(true);
+    try {
+      // 1. 更新 inquiries 记录的 isPublic 属性
+      await updateDoc(doc(db, 'inquiries', inq.id), {
+        isPublic: willBePublic,
+      });
+
+      // 2. 更新 siteConfig/disclosure 中的 messageInquiries 数组
+      let updatedFaqs = [...contentData.interaction.messageInquiries];
+      if (willBePublic) {
+        const rawDate = formatInquiryTime(inq.createdAt);
+        const faqItem: MessageInquiryItem = {
+          id: syncId,
+          user: inq.name,
+          date: rawDate ? rawDate.slice(0, 10) : inq.replyDate || new Date().toISOString().slice(0, 10),
+          question: inq.content,
+          reply: inq.reply,
+          replyDate: inq.replyDate || new Date().toISOString().slice(0, 10),
+        };
+        const idx = updatedFaqs.findIndex((m) => m.id === syncId);
+        if (idx >= 0) {
+          updatedFaqs[idx] = faqItem;
+        } else {
+          updatedFaqs = [faqItem, ...updatedFaqs];
+        }
+        await persistDisclosure(
+          {
+            ...contentData,
+            interaction: { ...contentData.interaction, messageInquiries: updatedFaqs },
+          },
+          '已同步选登至前台【咨询留言公开选登】专栏！'
+        );
+      } else {
+        updatedFaqs = updatedFaqs.filter((m) => m.id !== syncId && m.question !== inq.content);
+        await persistDisclosure(
+          {
+            ...contentData,
+            interaction: { ...contentData.interaction, messageInquiries: updatedFaqs },
+          },
+          '已从前台【咨询留言公开选登】专栏中撤下'
+        );
+      }
+    } catch (err: any) {
+      showToast('操作失败：' + (err.message || '请稍后重试'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleUpdateInquiryStatus = async (id: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, 'inquiries', id), { status: newStatus });
@@ -756,10 +972,24 @@ export default function AdminDisclosurePage() {
     }
   };
 
-  const handleDeleteInquiry = async (id: string) => {
+  const handleDeleteInquiry = async () => {
+    if (!deleteTargetInquiry) return;
     try {
-      await deleteDoc(doc(db, 'inquiries', id));
-      showToast('已删除该条用户留言记录');
+      await deleteDoc(doc(db, 'inquiries', deleteTargetInquiry.id));
+      const syncId = 'mi-inq-' + deleteTargetInquiry.id;
+      if (contentData.interaction.messageInquiries.some((m) => m.id === syncId)) {
+        const updatedFaqs = contentData.interaction.messageInquiries.filter((m) => m.id !== syncId);
+        await persistDisclosure(
+          {
+            ...contentData,
+            interaction: { ...contentData.interaction, messageInquiries: updatedFaqs },
+          },
+          '已删除该留言记录及前台同步选登条目'
+        );
+      } else {
+        showToast('已删除该条用户留言记录');
+      }
+      setDeleteTargetInquiry(null);
     } catch (err: any) {
       showToast('删除失败：' + (err.message || '请稍后重试'), 'error');
     }
@@ -1394,51 +1624,225 @@ export default function AdminDisclosurePage() {
           {/* 3. 实时在线收信池 */}
           {interactionSubTab === 'online' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">前台用户在线提交的咨询留言、意见建言与纠错信件（实时入库）。</span>
-                <span className="text-xs font-semibold text-blue-900">共 {userInquiries.length} 条</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">用户实时在线留言诉求池</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    前台用户提交的咨询留言、意见建言与纠错信件（实时入库），支持在线办理、录入正式官方答复并一键选登至前台。
+                  </p>
+                </div>
+
+                {/* 状态快捷筛选 */}
+                <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setInquiryStatusFilter('all')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      inquiryStatusFilter === 'all'
+                        ? 'bg-white text-blue-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    全部 ({userInquiries.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInquiryStatusFilter('pending')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                      inquiryStatusFilter === 'pending'
+                        ? 'bg-white text-amber-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>待办理</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800">
+                      {userInquiries.filter((i) => !i.reply || i.status === '待审核办理' || i.status === '办理中').length}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInquiryStatusFilter('resolved')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                      inquiryStatusFilter === 'resolved'
+                        ? 'bg-white text-emerald-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>已答复</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-100 text-emerald-800">
+                      {userInquiries.filter((i) => !!i.reply || i.status === '已答复办结').length}
+                    </span>
+                  </button>
+                </div>
               </div>
 
               {loadingInquiries ? (
-                <div className="py-8 text-center text-xs text-slate-400">正在载入信件...</div>
+                <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p>正在载入信件...</p>
+                </div>
               ) : userInquiries.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                  当前暂无待办用户留言
+                <div className="py-12 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                  当前信箱暂无在线留言记录
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {userInquiries.map((inq) => (
-                    <div key={inq.id} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">
-                            {inq.type}
-                          </span>
-                          <span className="text-xs font-bold text-slate-900">{inq.name}</span>
-                          <span className="text-xs text-slate-500 font-mono">({inq.contact})</span>
+                <div className="space-y-4">
+                  {userInquiries
+                    .filter((inq) => {
+                      if (inquiryStatusFilter === 'pending') {
+                        return !inq.reply || inq.status === '待审核办理' || inq.status === '办理中';
+                      }
+                      if (inquiryStatusFilter === 'resolved') {
+                        return !!inq.reply || inq.status === '已答复办结';
+                      }
+                      return true;
+                    })
+                    .map((inq) => {
+                      const isPubliclyShared = contentData.interaction.messageInquiries.some(
+                        (m) => m.id === 'mi-inq-' + inq.id || (m.question === inq.content && m.user === inq.name)
+                      );
+                      const isResolved = !!inq.reply || inq.status === '已答复办结';
+
+                      return (
+                        <div
+                          key={inq.id}
+                          className={`p-4 rounded-xl border transition-all space-y-3 ${
+                            isResolved
+                              ? 'border-slate-200 bg-white hover:border-slate-300'
+                              : 'border-amber-200 bg-amber-50/20 hover:border-amber-300'
+                          }`}
+                        >
+                          {/* 留言头部元信息 */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  inq.type === '咨询留言'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : inq.type === '意见建言'
+                                    ? 'bg-purple-100 text-purple-800'
+                                    : 'bg-rose-100 text-rose-800'
+                                }`}
+                              >
+                                {inq.type || '咨询留言'}
+                              </span>
+                              <span className="text-xs font-bold text-slate-900">{inq.name}</span>
+                              <span className="text-xs text-slate-500 font-mono">
+                                联系方式：{inq.contact || '未提供'}
+                              </span>
+                              {inq.createdAt && (
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  提交时间：{formatInquiryTime(inq.createdAt)}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* 是否前台公开徽章 */}
+                              {isPubliclyShared && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                  <span>🌐</span>
+                                  <span>已公开选登</span>
+                                </span>
+                              )}
+
+                              {/* 状态徽章 */}
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                                  isResolved
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                    : inq.status === '办理中'
+                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                    : 'bg-amber-100 text-amber-800 border-amber-200'
+                                }`}
+                              >
+                                {inq.status || (isResolved ? '已答复办结' : '待审核办理')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 留言正文内容 */}
+                          <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+                            <span className="font-semibold text-slate-600 block mb-1">【诉求与咨询内容】</span>
+                            {inq.content}
+                          </div>
+
+                          {/* 官方答复预览卡片（如果已填写答复） */}
+                          {inq.reply ? (
+                            <div className="p-3.5 rounded-lg bg-emerald-50/70 border border-emerald-200 text-xs text-slate-700 leading-relaxed space-y-1.5">
+                              <div className="flex flex-wrap items-center justify-between gap-1.5 font-semibold text-emerald-900 border-b border-emerald-100 pb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                  <span>{inq.repliedBy || '国专委秘书处'} 办理答复意见：</span>
+                                </div>
+                                <span className="text-[11px] text-emerald-700 font-mono font-normal">
+                                  答复日期：{inq.replyDate || '近期'}
+                                </span>
+                              </div>
+                              <p className="text-slate-800 whitespace-pre-wrap font-medium">{inq.reply}</p>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 rounded-lg bg-amber-50/60 border border-amber-100 text-[11px] text-amber-800 flex items-center justify-between">
+                              <span>⚠️ 该条留言尚未录入正式官方答复，请点击右侧“办理答复”按钮完成答复。</span>
+                            </div>
+                          )}
+
+                          {/* 底部操作工具条 */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 text-[11px]">快捷状态：</span>
+                              <select
+                                value={inq.status || (isResolved ? '已答复办结' : '待审核办理')}
+                                onChange={(e) => handleUpdateInquiryStatus(inq.id, e.target.value)}
+                                className="text-xs border border-slate-200 rounded-md px-2 py-1 bg-white font-medium focus:ring-1 focus:ring-blue-500"
+                              >
+                                <option value="待审核办理">待审核办理</option>
+                                <option value="办理中">办理中</option>
+                                <option value="已答复办结">已答复办结</option>
+                              </select>
+
+                              {/* 快速公开同步切换 */}
+                              {inq.reply && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleInquiryPublic(inq)}
+                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md border transition-colors cursor-pointer ${
+                                    isPubliclyShared
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                  title={isPubliclyShared ? '点击从前台公开选登撤下' : '点击同步到前台公开选登'}
+                                >
+                                  {isPubliclyShared ? '✓ 已公开选登 (点击撤下)' : '+ 同步到前台公开'}
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReplyModal(inq)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs ${
+                                  inq.reply
+                                    ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                                    : 'bg-blue-900 text-white hover:bg-blue-800'
+                                }`}
+                              >
+                                <span>{inq.reply ? '✏️ 修改答复' : '✍️ 办理答复'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTargetInquiry(inq)}
+                                className="px-2.5 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg cursor-pointer transition-colors"
+                              >
+                                删除
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={inq.status || '待审核办理'}
-                            onChange={(e) => handleUpdateInquiryStatus(inq.id, e.target.value)}
-                            className="text-xs border border-slate-200 rounded px-2 py-1 bg-white font-medium"
-                          >
-                            <option value="待审核办理">待审核办理</option>
-                            <option value="办理中">办理中</option>
-                            <option value="已答复办结">已答复办结</option>
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteInquiry(inq.id)}
-                            className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded cursor-pointer"
-                          >
-                            删除
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{inq.content}</p>
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -2210,21 +2614,175 @@ export default function AdminDisclosurePage() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════
+          Modal: 办理答复用户留言
+      ══════════════════════════════════════════════════════════════ */}
+      {isReplyModalOpen && replyingInquiry && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+            <form onSubmit={handleSaveReply} className="p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-900"></span>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {replyingInquiry.reply ? '修改官方答复意见' : '办理答复用户留言 / 咨询'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReplyModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 用户原留言摘要 */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 text-slate-500 pb-2 border-b border-slate-200/60">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-800">
+                      {replyingInquiry.type || '咨询留言'}
+                    </span>
+                    <span className="font-bold text-slate-900">{replyingInquiry.name}</span>
+                    <span className="font-mono text-slate-500">({replyingInquiry.contact || '未提供联系方式'})</span>
+                  </div>
+                  {replyingInquiry.createdAt && (
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      提交时间：{formatInquiryTime(replyingInquiry.createdAt)}
+                    </span>
+                  )}
+                </div>
+                <div className="text-slate-700 leading-relaxed">
+                  <span className="font-bold text-slate-900 mr-1">留言原意：</span>
+                  {replyingInquiry.content}
+                </div>
+              </div>
+
+              {/* 答复表单字段 */}
+              <div className="space-y-3 text-xs">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-700 font-semibold">官方办理答复内容 *</label>
+                    <span className="text-[11px] text-slate-400">请保持严谨、规范、客观的公文表述</span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={replyFormData.reply}
+                    onChange={(e) => setReplyFormData({ ...replyFormData, reply: e.target.value })}
+                    placeholder="输入国专委秘书处的正式答复内容及办理意见..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 leading-relaxed font-normal"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">答复部门 / 经办人</label>
+                    <input
+                      type="text"
+                      value={replyFormData.repliedBy}
+                      onChange={(e) => setReplyFormData({ ...replyFormData, repliedBy: e.target.value })}
+                      placeholder="如：国专委秘书处"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-semibold mb-1">答复日期 *</label>
+                    <input
+                      type="date"
+                      value={replyFormData.replyDate}
+                      onChange={(e) => setReplyFormData({ ...replyFormData, replyDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">办结状态</label>
+                  <select
+                    value={replyFormData.status}
+                    onChange={(e) => setReplyFormData({ ...replyFormData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                  >
+                    <option value="已答复办结">已答复办结（正常结办）</option>
+                    <option value="办理中">办理中（部分办结/需进一步核实）</option>
+                    <option value="待审核办理">待审核办理</option>
+                  </select>
+                </div>
+
+                {/* 前台公开选登同步开关 */}
+                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="publishToFrontend"
+                    checked={replyFormData.publishToFrontend}
+                    onChange={(e) =>
+                      setReplyFormData({ ...replyFormData, publishToFrontend: e.target.checked })
+                    }
+                    className="mt-0.5 w-4 h-4 text-blue-900 border-slate-300 rounded focus:ring-blue-800 cursor-pointer"
+                  />
+                  <label htmlFor="publishToFrontend" className="text-xs select-none cursor-pointer">
+                    <span className="font-bold text-blue-900 block">
+                      同步发布至前台【咨询留言公开选登】专栏
+                    </span>
+                    <span className="text-slate-500 text-[11px] leading-relaxed block mt-0.5">
+                      勾选后，该问答将自动在前台“信息公开 &gt; 互动交流 &gt; 咨询留言公开选登”中对社会公众展示，方便同类问题查阅。
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsReplyModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 text-xs font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {saving ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>保存中...</span>
+                    </>
+                  ) : (
+                    <span>提交正式答复</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
           Modal: 删除确认弹窗（Tailwind 原生，无 alert/confirm）
       ══════════════════════════════════════════════════════════════ */}
       {(deleteTargetLeader ||
         deleteTargetOrg ||
         deleteTargetReport ||
-        deleteTargetActivity) && (
+        deleteTargetActivity ||
+        deleteTargetInquiry) && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4 border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-lg">
               !
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">确认删除该项目？</h3>
+              <h3 className="text-sm font-bold text-slate-900">
+                {deleteTargetInquiry ? '确认删除该条用户留言记录？' : '确认删除该项目？'}
+              </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                删除后将立即生效并在前台信息公开频道对应板块中隐藏。
+                {deleteTargetInquiry
+                  ? '删除后该留言将从后台收信池中永久移除，若此前已同步选登至前台也将一并撤下。'
+                  : '删除后将立即生效并在前台信息公开频道对应板块中隐藏。'}
               </p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -2235,6 +2793,7 @@ export default function AdminDisclosurePage() {
                   setDeleteTargetOrg(null);
                   setDeleteTargetReport(null);
                   setDeleteTargetActivity(null);
+                  setDeleteTargetInquiry(null);
                 }}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
               >
@@ -2247,6 +2806,7 @@ export default function AdminDisclosurePage() {
                   else if (deleteTargetOrg) handleDeleteOrg();
                   else if (deleteTargetReport) handleDeleteReport();
                   else if (deleteTargetActivity) handleDeleteActivity();
+                  else if (deleteTargetInquiry) handleDeleteInquiry();
                 }}
                 className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer"
               >

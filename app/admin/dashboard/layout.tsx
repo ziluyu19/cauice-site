@@ -15,34 +15,75 @@ export default function AdminDashboardLayout({
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 认证状态监听与未登录安全拦截
+  // 认证状态监听与未登录安全拦截（带 3 秒超时机制）
   useEffect(() => {
-    // 3秒安全熔断，防止由于网络原因导致一直停留在“正在校验管理员权限...”
-    const timer = setTimeout(() => {
+    let isHandled = false;
+
+    // 3 秒超时机制：如果 3 秒后仍未拿到登录状态，强制使用 router.push('/admin/login') 跳转到登录页
+    const timeoutTimer = setTimeout(() => {
+      if (isHandled) return;
+      isHandled = true;
+
       if (auth.currentUser) {
         setCurrentUser(auth.currentUser);
         setLoading(false);
       } else {
-        setLoading(false);
-        router.replace('/admin/login');
+        setErrorMessage('网络超时或当前域名未授权，请重试');
+        try {
+          sessionStorage.setItem('admin_auth_error', '网络超时或当前域名未授权，请重试');
+        } catch (e) {}
+
+        // 强制使用 router.push('/admin/login') 跳转到登录页
+        router.push('/admin/login');
+
+        // 作为内网/极端环境下的安全跳转兜底
+        const fallbackTimer = setTimeout(() => {
+          if (window.location.pathname.startsWith('/admin/dashboard')) {
+            window.location.href = '/admin/login';
+          }
+        }, 800);
+
+        return () => clearTimeout(fallbackTimer);
       }
     }, 3000);
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      clearTimeout(timer);
-      if (user) {
-        setCurrentUser(user);
-        setLoading(false);
-      } else {
-        setLoading(false);
-        router.replace('/admin/login');
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (user) => {
+        if (isHandled) return;
+        isHandled = true;
+        clearTimeout(timeoutTimer);
+
+        if (user) {
+          setCurrentUser(user);
+          setLoading(false);
+        } else {
+          setErrorMessage('网络超时或当前域名未授权，请重试');
+          try {
+            sessionStorage.setItem('admin_auth_error', '网络超时或当前域名未授权，请重试');
+          } catch (e) {}
+          router.push('/admin/login');
+        }
+      },
+      (error) => {
+        if (isHandled) return;
+        isHandled = true;
+        clearTimeout(timeoutTimer);
+        console.warn('onAuthStateChanged error:', error);
+        setErrorMessage('网络超时或当前域名未授权，请重试');
+        try {
+          sessionStorage.setItem('admin_auth_error', '网络超时或当前域名未授权，请重试');
+        } catch (e) {}
+        router.push('/admin/login');
       }
-    });
+    );
 
     return () => {
-      clearTimeout(timer);
+      isHandled = true;
+      clearTimeout(timeoutTimer);
       unsubscribe();
     };
   }, [router]);
@@ -161,12 +202,44 @@ export default function AdminDashboardLayout({
     link.href = '/logo.png?v=2';
   }, [currentNav]);
 
-  // 校验中状态展示
+  // 校验中状态展示与超时友好提示
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-300 space-y-4">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <div className="text-sm tracking-wider font-medium">正在校验管理员权限...</div>
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-slate-300 p-4">
+        {errorMessage ? (
+          <div className="bg-slate-800/90 border border-amber-500/40 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in duration-200">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-white tracking-wide">
+                管理员权限校验未通过
+              </h3>
+              <p className="text-xs text-amber-300 font-medium">
+                {errorMessage}
+              </p>
+              <p className="text-[11px] text-slate-400 pt-1 leading-relaxed">
+                系统正在为您跳转到登录页面... 如未自动跳转，请点击下方按钮。
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => router.push('/admin/login')}
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-md transition-colors cursor-pointer"
+              >
+                立即前往登录页
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center space-y-4">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-sm tracking-wider font-medium">正在校验管理员权限...</div>
+          </div>
+        )}
       </div>
     );
   }

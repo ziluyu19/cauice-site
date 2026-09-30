@@ -15,8 +15,19 @@ export default function AdminLoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 若已处于登录状态，自动重定向到后台首页
+  // 若已处于登录状态，自动重定向到后台首页；读取超时与权限提示
   useEffect(() => {
+    // 读取来自后台权限校验超时或域名未授权的提示
+    if (typeof window !== 'undefined') {
+      try {
+        const storedError = sessionStorage.getItem('admin_auth_error');
+        if (storedError) {
+          setErrorMsg(storedError);
+          sessionStorage.removeItem('admin_auth_error');
+        }
+      } catch (e) {}
+    }
+
     // 3秒安全熔断，防止由于网络波动导致长时间处于“正在校验系统权限...”
     const timer = setTimeout(() => {
       setCheckingAuth(false);

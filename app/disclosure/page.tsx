@@ -519,30 +519,36 @@ export default function DisclosurePage() {
             </div>
 
             <div className="space-y-4">
-              {contentData.interaction.messageInquiries.map((inq, idx) => (
-                <div
-                  key={inq.id || idx}
-                  className="p-4 rounded-xl border border-slate-200 bg-white space-y-3"
-                >
-                  <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-100 pb-2">
-                    <span className="font-semibold text-slate-700">留言人：{inq.user}</span>
-                    <span className="font-mono">提交时间：{inq.date}</span>
-                  </div>
-                  <div className="text-xs text-slate-800 leading-relaxed">
-                    <span className="font-bold text-blue-900">问：</span>
-                    {inq.question}
-                  </div>
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed space-y-1">
-                    <div className="flex items-center justify-between font-semibold text-emerald-800">
-                      <span>国专委秘书处答复：</span>
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        答复时间：{inq.replyDate}
-                      </span>
-                    </div>
-                    <p className="text-slate-600">{inq.reply}</p>
-                  </div>
+              {contentData.interaction.messageInquiries.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                  暂无公开选登咨询答复记录
                 </div>
-              ))}
+              ) : (
+                contentData.interaction.messageInquiries.map((inq, idx) => (
+                  <div
+                    key={inq.id || idx}
+                    className="p-4 rounded-xl border border-slate-200 bg-white space-y-3"
+                  >
+                    <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-100 pb-2">
+                      <span className="font-semibold text-slate-700">留言人：{inq.user}</span>
+                      <span className="font-mono">提交时间：{inq.date}</span>
+                    </div>
+                    <div className="text-xs text-slate-800 leading-relaxed">
+                      <span className="font-bold text-blue-900">问：</span>
+                      {inq.question}
+                    </div>
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed space-y-1">
+                      <div className="flex items-center justify-between font-semibold text-emerald-800">
+                        <span>国专委秘书处答复：</span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          答复时间：{inq.replyDate}
+                        </span>
+                      </div>
+                      <p className="text-slate-600">{inq.reply}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

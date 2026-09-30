@@ -1,16 +1,31 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import SearchModal from "./SearchModal";
 
 export default function Navbar() {
+  const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedMobileItem, setExpandedMobileItem] = useState<string | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [loginTab, setLoginTab] = useState<"account" | "sms">("account");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 全局快捷键 ⌘K / Ctrl+K 快速唤起全栈搜索大厅
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // 后台管理页面无需渲染前台主导航
   if (pathname?.startsWith("/admin")) {
@@ -237,18 +252,45 @@ export default function Navbar() {
 
           {/* 右侧动作区：搜索与快捷按钮 */}
           <div className="hidden lg:flex items-center space-x-4">
-            <div className="relative">
+            {/* 全栈搜索输入入口 */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (searchQuery.trim()) {
+                  router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                } else {
+                  setIsSearchOpen(true);
+                }
+              }}
+              className="relative"
+            >
               <input
                 type="text"
                 placeholder="搜索政策、公告、智库报告..."
                 value={searchQuery}
+                onFocus={() => setIsSearchOpen(true)}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-9 pr-3 py-1.5 text-xs rounded-full border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-transparent bg-slate-50"
+                className="w-64 pl-9 pr-9 py-1.5 text-xs rounded-full border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-800 focus:border-transparent bg-slate-50 cursor-pointer hover:border-blue-400 transition-all"
               />
-              <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="w-4 h-4 text-slate-400 hover:text-blue-800 absolute left-3 top-2 cursor-pointer transition-colors"
+                aria-label="打开搜索"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="absolute right-2.5 top-1.5 text-[10px] text-slate-400 bg-slate-200/80 px-1.5 py-0.5 rounded font-mono hover:bg-slate-300 transition-colors cursor-pointer select-none"
+                title="按 Ctrl+K 快速检索"
+              >
+                ⌘K
+              </button>
+            </form>
 
             <button
               onClick={() => setIsLoginOpen(true)}
@@ -265,8 +307,18 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* 移动端菜单开关 */}
-          <div className="flex lg:hidden items-center space-x-2">
+          {/* 移动端菜单与搜索按钮 */}
+          <div className="flex lg:hidden items-center space-x-1.5">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="p-1.5 text-slate-600 hover:text-blue-900 rounded-lg hover:bg-slate-100 transition-colors"
+              aria-label="全网搜索"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
             <button
               onClick={() => setIsLoginOpen(true)}
               className="px-3 py-1.5 text-xs font-medium rounded bg-blue-800 text-white"
@@ -383,6 +435,26 @@ export default function Navbar() {
             {/* 移动端下拉菜单与二级栏目折叠 */}
             {mobileMenuOpen && (
               <div className="lg:hidden py-3 border-t border-blue-800 space-y-1 max-h-[calc(100vh-130px)] overflow-y-auto">
+                {/* 移动端快捷检索入口 */}
+                <div className="px-3 pb-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setIsSearchOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between px-3.5 py-2 rounded-lg bg-blue-950/70 border border-blue-700/60 text-xs text-blue-200 hover:text-white hover:bg-blue-800/60 transition-colors"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <svg className="w-4 h-4 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>搜索全站政策、公告、报告...</span>
+                    </span>
+                    <span className="text-[10px] bg-blue-800 px-1.5 py-0.5 rounded text-blue-100 font-mono">搜索</span>
+                  </button>
+                </div>
+
                 {navItems.map((item, idx) => {
                   const isExpanded = expandedMobileItem === item.name;
                   const isActive =
@@ -624,6 +696,14 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* 全栈智能搜索浮层 (Full-Site Search Dialog) */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        initialQuery={searchQuery}
+        onNavigate={handleNavClick}
+      />
     </>
   );
 }
