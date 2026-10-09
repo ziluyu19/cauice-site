@@ -205,13 +205,13 @@ export default function Navbar() {
                 信息公开
               </Link>
               <span className="text-slate-700 select-none">|</span>
-              <Link
-                href="/#global"
-                onClick={(e) => handleNavClick(e, "/#global")}
+              <a
+                href={process.env.NEXT_PUBLIC_EN_SITE_URL || "http://localhost:3001/en"}
                 className="hover:text-white transition-colors select-none"
+                title="切换至英文版网站"
               >
-                English Version
-              </Link>
+                EN切换
+              </a>
               <span className="text-slate-700 select-none">|</span>
               <button
                 onClick={() => setIsLoginOpen(true)}
@@ -541,7 +541,14 @@ export default function Navbar() {
                     </div>
                   );
                 })}
-                <div className="pt-2 border-t border-blue-800">
+                <div className="pt-2 border-t border-blue-800 space-y-1">
+                  <a
+                    href={process.env.NEXT_PUBLIC_EN_SITE_URL || "http://localhost:3001/en"}
+                    className="block px-3 py-2 text-sm text-blue-200 hover:bg-blue-800 rounded flex items-center justify-between"
+                  >
+                    <span>英文版网站</span>
+                    <span className="text-xs bg-blue-800 px-2 py-0.5 rounded text-white font-mono">EN切换</span>
+                  </a>
                   <Link
                     href="/#contact"
                     onClick={(e) => {

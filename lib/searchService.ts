@@ -428,95 +428,106 @@ if (Array.isArray(defaultDisclosureContentData?.credit?.commitments)) {
  */
 let dynamicFirestoreIndex: SearchResultItem[] = [];
 let hasFetchedLiveDocs = false;
+let isFetchingLiveDocs = false;
 
 export async function fetchLiveSearchDocs(): Promise<SearchResultItem[]> {
   if (hasFetchedLiveDocs && dynamicFirestoreIndex.length > 0) {
     return dynamicFirestoreIndex;
   }
 
+  // 避免并发重复拉取
+  if (isFetchingLiveDocs) {
+    return dynamicFirestoreIndex;
+  }
+  isFetchingLiveDocs = true;
+
   const liveItems: SearchResultItem[] = [];
 
-  try {
+  // 并行拉取任务与超时熔断保护（最长等待 2.5 秒，保障前台毫秒级即时响应）
+  const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 2500));
+
+  const fetchPromise = Promise.allSettled([
     // 1. 新闻数据
-    const newsSnap = await getDocs(query(collection(db, 'news'), limit(20)));
-    newsSnap.forEach((doc) => {
-      const d = doc.data();
-      liveItems.push({
-        id: `live-news-${doc.id}`,
-        title: d.title || '最新动态',
-        category: '新闻中心',
-        badge: d.category || '要闻',
-        summary: d.summary || d.content?.slice(0, 100) || '',
-        date: d.date || '',
-        url: '/news#committee-news',
-        keywords: [d.title, d.category, '新闻动态'],
+    getDocs(query(collection(db, 'news'), limit(20))).then((snap) => {
+      snap.forEach((doc) => {
+        const d = doc.data();
+        liveItems.push({
+          id: `live-news-${doc.id}`,
+          title: d.title || '最新动态',
+          category: '新闻中心',
+          badge: d.category || '要闻',
+          summary: d.summary || d.content?.slice(0, 100) || '',
+          date: d.date || '',
+          url: '/news#committee-news',
+          keywords: [d.title, d.category, '新闻动态'],
+        });
       });
-    });
-  } catch (e) {
-    // ignore
-  }
+    }),
 
-  try {
     // 2. 通知数据
-    const noticesSnap = await getDocs(query(collection(db, 'notices'), limit(20)));
-    noticesSnap.forEach((doc) => {
-      const d = doc.data();
-      liveItems.push({
-        id: `live-notice-${doc.id}`,
-        title: d.title || '通知公告',
-        category: '通知公告',
-        badge: d.category || '通知',
-        summary: d.summary || d.content?.slice(0, 100) || '',
-        date: d.date || '',
-        url: '/notice#latest',
-        keywords: [d.title, d.category, '通知公告'],
+    getDocs(query(collection(db, 'notices'), limit(20))).then((snap) => {
+      snap.forEach((doc) => {
+        const d = doc.data();
+        liveItems.push({
+          id: `live-notice-${doc.id}`,
+          title: d.title || '通知公告',
+          category: '通知公告',
+          badge: d.category || '通知',
+          summary: d.summary || d.content?.slice(0, 100) || '',
+          date: d.date || '',
+          url: '/notice#latest',
+          keywords: [d.title, d.category, '通知公告'],
+        });
       });
-    });
-  } catch (e) {
-    // ignore
-  }
+    }),
 
-  try {
     // 3. 国际合作项目
-    const projectsSnap = await getDocs(query(collection(db, 'projects'), limit(20)));
-    projectsSnap.forEach((doc) => {
-      const d = doc.data();
-      liveItems.push({
-        id: `live-project-${doc.id}`,
-        title: d.name || '国际合作项目',
-        category: '国际合作',
-        badge: d.status || '合作项目',
-        summary: `中方：${d.chineseParty || ''} × 外方：${d.foreignParty || ''}。领域：${d.field || ''}，国别：${d.country || ''}`,
-        date: d.year || '',
-        url: '/international#projects',
-        keywords: [d.name, d.country, d.field, d.chineseParty, d.foreignParty],
+    getDocs(query(collection(db, 'projects'), limit(20))).then((snap) => {
+      snap.forEach((doc) => {
+        const d = doc.data();
+        liveItems.push({
+          id: `live-project-${doc.id}`,
+          title: d.name || '国际合作项目',
+          category: '国际合作',
+          badge: d.status || '合作项目',
+          summary: `中方：${d.chineseParty || ''} × 外方：${d.foreignParty || ''}。领域：${d.field || ''}，国别：${d.country || ''}`,
+          date: d.year || '',
+          url: '/international#projects',
+          keywords: [d.name, d.country, d.field, d.chineseParty, d.foreignParty],
+        });
       });
-    });
-  } catch (e) {
-    // ignore
-  }
+    }),
+
+    // 4. 会员单位
+    getDocs(query(collection(db, 'members'), limit(30))).then((snap) => {
+      snap.forEach((doc) => {
+        const d = doc.data();
+        liveItems.push({
+          id: `live-member-${doc.id}`,
+          title: d.name || '会员单位',
+          category: '会员单位与服务',
+          badge: d.level || d.type || '常务理事单位',
+          summary: `单位类别：${d.type || '高等院校'}，所在地区：${d.region || '全国'}。${d.desc || ''}`,
+          url: '/members#directory',
+          keywords: [d.name, d.type, d.region, '会员'],
+        });
+      });
+    }),
+  ]);
 
   try {
-    // 4. 会员单位
-    const membersSnap = await getDocs(query(collection(db, 'members'), limit(30)));
-    membersSnap.forEach((doc) => {
-      const d = doc.data();
-      liveItems.push({
-        id: `live-member-${doc.id}`,
-        title: d.name || '会员单位',
-        category: '会员单位与服务',
-        badge: d.level || d.type || '常务理事单位',
-        summary: `单位类别：${d.type || '高等院校'}，所在地区：${d.region || '全国'}。${d.desc || ''}`,
-        url: '/members#directory',
-        keywords: [d.name, d.type, d.region, '会员'],
-      });
-    });
+    await Promise.race([fetchPromise, timeoutPromise]);
   } catch (e) {
-    // ignore
+    // 降级兜底
+  } finally {
+    isFetchingLiveDocs = false;
   }
 
-  dynamicFirestoreIndex = liveItems;
-  hasFetchedLiveDocs = true;
+  if (liveItems.length > 0) {
+    dynamicFirestoreIndex = liveItems;
+    hasFetchedLiveDocs = true;
+  }
+
   return liveItems;
 }
 
