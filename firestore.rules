@@ -18,7 +18,16 @@ service cloud.firestore {
     // 新闻中心
     match /news/{documentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        // 允许前台访客真实递增阅读量，禁止修改标题、内容、日期等任何其他字段
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']) &&
+        request.resource.data.views is number &&
+        (
+          !('views' in resource.data) ||
+          request.resource.data.views >= resource.data.views
+        )
+      );
     }
 
     // 通知公告

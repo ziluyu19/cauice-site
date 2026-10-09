@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface NewsItem {
@@ -263,8 +263,26 @@ export default function Home() {
   const [liveReports, setLiveReports] = useState<ReportItem[]>(initialReports);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // 模态阅读弹窗状态
+  // 模态阅读弹窗状态与真实阅读量更新
   const [readingNews, setReadingNews] = useState<NewsItem | null>(null);
+
+  // 打开新闻并真实递增阅读量
+  const handleOpenNews = (item: NewsItem) => {
+    const currentViews = typeof item.views === 'number' ? item.views : 0;
+    const newViews = currentViews + 1;
+    // 乐观更新：弹窗与本地列表即刻显示最新阅读量
+    setReadingNews({ ...item, views: newViews });
+    setLiveNews((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, views: newViews } : n))
+    );
+
+    // 若为 Firestore 数据库真实文档，调用原子递增更新数据库
+    if (typeof item.id === 'string' && item.id.length > 0) {
+      updateDoc(doc(db, 'news', item.id), { views: increment(1) }).catch((err) => {
+        console.warn('Real-time views increment error:', err);
+      });
+    }
+  };
 
   // 实时订阅 Firestore 数据
   useEffect(() => {
@@ -284,7 +302,7 @@ export default function Home() {
                 tag: d.category === '专委会动态' ? '国专委动态' : (d.tag || d.category || '要闻'),
                 summary: d.summary || '',
                 date: d.date || '',
-                views: d.views || 100,
+                views: typeof d.views === 'number' ? d.views : 0,
                 type: (d.category === '国专委要闻' || d.category === '国专委动态' || d.category === '专委会动态')
                   ? 'committee'
                   : (d.category === '会员单位动态' || d.category === '行业热点' || d.category === '成果转化')
@@ -637,13 +655,14 @@ export default function Home() {
               {/* 首条焦点新闻卡片 */}
               {filteredNews.length > 0 && (
                 <div
-                  onClick={() => setReadingNews(filteredNews[0])}
+                  onClick={() => handleOpenNews(filteredNews[0])}
                   className="group block mb-6 p-4 rounded-lg bg-blue-50/50 border border-blue-100 hover:border-blue-300 transition-all cursor-pointer"
                 >
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="px-2 py-0.5 text-xs font-bold bg-red-600 text-white rounded">最新头条</span>
                     <span className="text-xs text-blue-700 font-semibold">{filteredNews[0].tag}</span>
                     <span className="text-xs text-slate-400">| {filteredNews[0].date}</span>
+                    <span className="text-xs text-slate-400">| 阅读 {filteredNews[0].views ?? 0}</span>
                   </div>
                   <h3 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-blue-800 transition-colors leading-snug">
                     {filteredNews[0].title}
@@ -659,7 +678,7 @@ export default function Home() {
                 {filteredNews.slice(1).map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => setReadingNews(item)}
+                    onClick={() => handleOpenNews(item)}
                     className="py-3.5 group flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50 px-2 rounded transition-colors cursor-pointer"
                   >
                     <div className="flex items-start sm:items-center space-x-2">
@@ -672,7 +691,7 @@ export default function Home() {
                     </div>
                     <div className="shrink-0 flex items-center space-x-3 text-xs text-slate-400 pl-2 sm:pl-0">
                       <span>{item.date}</span>
-                      <span className="hidden sm:inline">阅读 {item.views}</span>
+                      <span className="hidden sm:inline">阅读 {item.views ?? 0}</span>
                     </div>
                   </div>
                 ))}
@@ -1234,7 +1253,7 @@ export default function Home() {
                     {readingNews.title}
                   </h3>
                   <div className="text-xs text-slate-400">
-                    发布日期：{readingNews.date} {readingNews.views ? `· 阅读量：${readingNews.views}` : ''}
+                    发布日期：{readingNews.date} · 阅读量：{readingNews.views ?? 0}
                   </div>
                 </div>
                 <button

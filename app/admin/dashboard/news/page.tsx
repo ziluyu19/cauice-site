@@ -21,6 +21,7 @@ interface NewsItem {
   date: string;
   summary: string;
   content: string;
+  views?: number;
   createdAt?: any;
 }
 
@@ -76,6 +77,7 @@ export default function AdminNewsPage() {
             return {
               id: docSnap.id,
               ...data,
+              views: typeof data.views === 'number' ? data.views : 0,
               category: (
                 data.category === '专委会动态' ? '国专委动态' : (data.category || '国专委动态')
               ).replace(/专委会/g, '国专委'),
@@ -95,6 +97,7 @@ export default function AdminNewsPage() {
                 return {
                   id: docSnap.id,
                   ...data,
+                  views: typeof data.views === 'number' ? data.views : 0,
                   category: (
                     data.category === '专委会动态' ? '国专委动态' : (data.category || '国专委动态')
                   ).replace(/专委会/g, '国专委'),
@@ -234,6 +237,7 @@ export default function AdminNewsPage() {
           date: formData.date,
           summary: autoSummary,
           content: formData.content.trim(),
+          views: 0,
           createdAt: serverTimestamp(),
         });
         showToast('新闻发布成功！已存入数据库。');
@@ -424,7 +428,10 @@ export default function AdminNewsPage() {
                       <span className={`px-2.5 py-0.5 rounded font-semibold text-[11px] border ${badge.className}`}>
                         {badge.label}
                       </span>
-                      <span className="text-slate-400 font-mono text-[11px]">{item.date}</span>
+                      <div className="flex items-center space-x-2 text-slate-400 font-mono text-[11px]">
+                        <span>{item.date}</span>
+                        <span>· 阅读: {item.views ?? 0}</span>
+                      </div>
                     </div>
 
                     <div>
@@ -468,6 +475,7 @@ export default function AdminNewsPage() {
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">分类标签</th>
                     <th className="px-4 py-3 font-semibold min-w-[240px]">新闻标题</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap">日期</th>
+                    <th className="px-4 py-3 font-semibold whitespace-nowrap">阅读量</th>
                     <th className="px-4 py-3 font-semibold min-w-[220px]">摘要简介</th>
                     <th className="px-4 py-3 font-semibold whitespace-nowrap text-right">管理操作</th>
                   </tr>
@@ -493,6 +501,9 @@ export default function AdminNewsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-slate-500 font-mono whitespace-nowrap">
                           {item.date}
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-700 font-mono whitespace-nowrap font-medium">
+                          {item.views ?? 0}
                         </td>
                         <td className="px-4 py-3.5 text-slate-600 leading-relaxed line-clamp-2">
                           {item.summary || item.content?.slice(0, 80)}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 interface NewsItem {
@@ -12,6 +12,7 @@ interface NewsItem {
   date: string;
   summary: string;
   content: string;
+  views?: number;
   createdAt?: any;
 }
 
@@ -27,8 +28,23 @@ export default function NewsPage() {
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 全文阅读模态框状态 (绝无 alert)
+  // 全文阅读模态框状态与实时递增
   const [readingNews, setReadingNews] = useState<NewsItem | null>(null);
+
+  // 打开新闻并真实原子递增阅读量
+  const handleOpenNews = (item: NewsItem) => {
+    const currentViews = typeof item.views === 'number' ? item.views : 0;
+    const newViews = currentViews + 1;
+    setReadingNews({ ...item, views: newViews });
+    setNewsList((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, views: newViews } : n))
+    );
+    if (typeof item.id === 'string' && item.id.length > 0) {
+      updateDoc(doc(db, 'news', item.id), { views: increment(1) }).catch((err) => {
+        console.warn('Real-time views increment error:', err);
+      });
+    }
+  };
 
   // 监听并平滑滚动到指定锚点
   const scrollToAnchor = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -79,6 +95,7 @@ export default function NewsPage() {
             return {
               id: docSnap.id,
               ...data,
+              views: typeof data.views === 'number' ? data.views : 0,
               category: (
                 data.category === '专委会动态' ? '国专委动态' : (data.category || '国专委动态')
               ).replace(/专委会/g, '国专委'),
@@ -98,6 +115,7 @@ export default function NewsPage() {
                 return {
                   id: docSnap.id,
                   ...data,
+                  views: typeof data.views === 'number' ? data.views : 0,
                   category: (
                     data.category === '专委会动态' ? '国专委动态' : (data.category || '国专委动态')
                   ).replace(/专委会/g, '国专委'),
@@ -229,7 +247,7 @@ export default function NewsPage() {
               {committeeNews.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => setReadingNews(item)}
+                  onClick={() => handleOpenNews(item)}
                   className="flex flex-col md:flex-row gap-5 p-5 rounded-xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all group cursor-pointer"
                 >
                   {/* 左侧权威发布标识 */}
@@ -246,6 +264,7 @@ export default function NewsPage() {
                         {item.category === '专委会动态' ? '国专委动态' : (item.category || '国专委要闻')}
                       </span>
                       <span className="text-xs text-slate-400 font-mono">{item.date}</span>
+                      <span className="text-xs text-slate-400 font-mono">· 阅读量 {item.views ?? 0}</span>
                     </div>
                     <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-800 transition-colors leading-snug">
                       {item.title}
@@ -293,7 +312,7 @@ export default function NewsPage() {
               {memberNews.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => setReadingNews(item)}
+                  onClick={() => handleOpenNews(item)}
                   className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-start gap-3 group hover:bg-emerald-50/30 -mx-2 px-2 rounded-lg transition-colors cursor-pointer"
                 >
                   <div className="sm:w-36 shrink-0 space-y-1">
@@ -301,6 +320,7 @@ export default function NewsPage() {
                     <span className="inline-block text-xs px-2 py-0.5 rounded font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
                       {item.category || '会员单位动态'}
                     </span>
+                    <div className="text-[11px] text-slate-400 font-mono">阅读量 {item.views ?? 0}</div>
                   </div>
                   <div className="flex-1 space-y-1.5">
                     <h3 className="text-sm font-bold text-slate-900 group-hover:text-emerald-800 transition-colors leading-snug">
@@ -345,7 +365,7 @@ export default function NewsPage() {
               {mediaFocusNews.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => setReadingNews(item)}
+                  onClick={() => handleOpenNews(item)}
                   className="p-5 rounded-xl border border-slate-200 bg-white hover:border-purple-300 hover:shadow-md transition-all group cursor-pointer flex flex-col justify-between space-y-3"
                 >
                   <div className="space-y-2">
@@ -353,7 +373,10 @@ export default function NewsPage() {
                       <span className="text-xs px-2.5 py-0.5 rounded font-semibold bg-purple-100 text-purple-900 border border-purple-200">
                         {item.category || '媒体关注与报道'}
                       </span>
-                      <span className="text-xs text-slate-400 font-mono">{item.date}</span>
+                      <div className="flex items-center space-x-2 text-xs text-slate-400 font-mono">
+                        <span>{item.date}</span>
+                        <span>· 阅读 {item.views ?? 0}</span>
+                      </div>
                     </div>
                     <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-900 transition-colors leading-snug">
                       {item.title}
@@ -406,6 +429,7 @@ export default function NewsPage() {
                   {readingNews.category}
                 </span>
                 <span className="text-xs text-slate-400 font-mono">发布日期：{readingNews.date}</span>
+                <span className="text-xs text-slate-400 font-mono">· 阅读量：{readingNews.views ?? 0}</span>
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
                 {readingNews.title}
